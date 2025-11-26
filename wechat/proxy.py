@@ -231,9 +231,9 @@ class Message:
             self.new_msg_id = data['newMsgId']
         self.type = parse_type
         if 'fromGroup' not in data:
-            return Exception('GroupID not found in message')
-
-        self.group_id = data['fromGroup']
+            self.group_id = ''
+        else:
+            self.group_id = data['fromGroup']
         self.global_user_id = '{}|{}'.format(self.group_id, data['fromUser'])
         self.push_content = data['pushContent'] if 'pushContent' in data else ''
         self.content = content
@@ -720,7 +720,7 @@ class WkteamManager:
     def bind(self, logdir: str, port: int, forward:bool=False):
         if not os.path.exists(logdir):
             os.makedirs(logdir)
-        logpath = os.path.join(logdir, 'wechat_message.jsonl')
+        logpath = os.path.join(logdir, 'message.jsonl')
 
         async def forward_msg(input_json: dict):
             msg = Message()
