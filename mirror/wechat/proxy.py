@@ -603,7 +603,7 @@ class WkteamManager:
         if err is not None:
             return err
 
-        logger.info('login success, all license saved to {}'.format(
+        logger.info('login success, all license come from {}'.format(
             self.license_path))
         return None
 
@@ -900,109 +900,6 @@ class WkteamManager:
             if msg._id < user_msg_id and msg.group_id == user.group_id:
                 conversations.append(msg)
         return conversations
-
-    async def loop(self, assistant):
-        """Fetch all messages from redis, split it by groupId; concat by
-        timestamp."""
-        from huixiangdou.services import ErrorCode, kimi_ocr
-        que = Queue(name='wechat')
-
-        while True:
-            # time.sleep(1)
-            # parse wx_msg, add it to group
-            for wx_msg_str in que.get_all():
-                # print(wx_msg_str)
-                # time.sleep(0.01)
-                # continue
-                wx_msg = json.loads(wx_msg_str)
-                logger.debug(wx_msg)
-                msg = Message()
-                err = msg.parse(wx_msg=wx_msg, bot_wxid=self.wcId, auth=self.auth, wkteam_ip_port=self.WKTEAM_IP_PORT)
-                if err is not None:
-                    logger.debug(str(err))
-                    continue
-                if msg.type == 'image':
-                    _, local_image_path = self.download_image(param=msg.data)
-
-                    llm_remote_type = get_env_with_default('LLM_REMOTE_TYPE', 'kimi')
-                    if local_image_path is not None and llm_remote_type == 'kimi':
-                        token = get_env_or_raise('LLM_REMOTE_API_KEY')
-                        msg.query = kimi_ocr(local_image_path, token)
-                        logger.debug('kimi ocr {} {}'.format(
-                            local_image_path, msg.query))
-
-                if len(msg.query) < 1:
-                    continue
-
-                self.messages.append(msg)
-                if msg.type == 'ref_for_others':
-                    continue
-
-                if msg.global_user_id not in self.users:
-                    self.users[msg.global_user_id] = User()
-                user = self.users[msg.global_user_id]
-                user.feed(msg)
-
-            # try concat all msgs in groups, fetch one to process
-            for user in self.users.values():
-                if len(user.history) < 1:
-                    continue
-
-                now = time.time()
-                # if a user not send new message in 12 seconds, process and mark it
-                if now - user.last_msg_time >= 12 and user.last_process_time < user.last_msg_time:
-                    if user.last_msg_type in ['link', 'image']:
-                        # if user image or link contains question, do not process
-                        continue
-
-                    logger.debug('before concat {}'.format(user))
-                    user.concat()
-                    logger.debug('after concat {}'.format(user))
-                    assert len(user.history) > 0
-
-                    item = user.history[-1]
-
-                    if item.reply is not None and len(item.reply) > 0:
-                        logger.error('item reply not None, {}'.format(item))
-                    query = item.query
-
-                    code = ErrorCode.QUESTION_TOO_SHORT
-                    resp = ''
-                    refs = []
-                    groupname = ''
-                    groupchats = []
-                    if user.group_id in self.group_whitelist:
-                        groupname = self.group_whitelist[user.group_id]
-
-                    if len(query) >= 8:
-                        groupchats = self.fetch_groupchats(user=user)
-                        tuple_history = convert_history_to_tuple(
-                            user.history[0:-1])
-
-                        async for sess in assistant.generate(
-                            query=query,
-                            history=tuple_history,
-                            groupname=groupname,
-                            groupchats=groupchats):
-                            code, resp, refs = sess.code, sess.response, sess.references
-
-                    # user history may affect normal conversation, so delete last query
-                    user.last_process_time = time.time()
-                    if code in [
-                            ErrorCode.NOT_A_QUESTION, ErrorCode.SECURITY,
-                            ErrorCode.NO_SEARCH_RESULT, ErrorCode.NO_TOPIC
-                    ]:
-                        logger.debug(
-                            'skip response {} {} {}'.format(code, query, resp))
-                        continue
-
-                    # send to user
-                    if len(resp) > 0:
-                        logger.debug('send {} to {}'.format(resp, user.group_id))
-                        self.send_message(user.group_id, resp)
-                        user.update_history(query, resp, refs)
-
-            await asyncio.sleep(1)
 
 def parse_args():
     """Parse args."""

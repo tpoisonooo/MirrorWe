@@ -1,22 +1,44 @@
 [project]
-name = "stock"
-version = "0.1.0"
-description = "Add your description here"
+name = "MirrorWe"
+version = "3.0.0"
+description = "微信智能助手，基于大语言模型"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.10"
+authors = [
+    {name = "tpoisonooo", email = "tpoisonooo@gmail.com"}
+]
+keywords = ["wechat", "llm", "ai", "chatbot"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Communications :: Chat",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
-    "aiohttp>=3.13.2",
+    "aiohttp>=3.6.0",
+    "aiofiles>=0.6.0",
     "bs4>=0.0.2",
-    "certifi>=2025.11.12",
-    "loguru>=0.7.3",
-    "matplotlib>=3.10.7",
-    "numpy>=2.3.5",
-    "openai>=2.8.1",
-    "python-dotenv>=1.2.1",
+    "certifi>=2020.0.0",
+    "loguru>=0.5.0",
+    "numpy>=1.19.0",
+    "openai>=1.0.0",
+    "python-dotenv>=0.19.0",
     "readability>=0.3.2",
     "readability-lxml>=0.8.4.1",
-    "requests>=2.32.5",
-    "tiktoken>=0.12.0",
+    "requests>=2.25.0",
+    "tiktoken>=0.4.0",
+    "beautifulsoup4>=4.9.0",
+    "lxml>=4.6.0",
+    "pytoml>=0.1.0",
+    "tenacity>=8.0.0",
 ]
 
 [[tool.uv.index]]

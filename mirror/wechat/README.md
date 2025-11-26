@@ -10,6 +10,7 @@
 wechat/
 ├── proxy.py              # 核心服务文件，包含微信登录、消息处理、转发功能
 ├── reorganize.py         # 日志重新整理工具
+├── json_parser.py        # 多行JSON解析工具函数
 ├── origin.jsonl          # 原始消息日志（所有消息的完整备份）
 ├── friends/              # 私聊消息分类目录
 │   ├── {friend_wxid}/
@@ -70,7 +71,11 @@ python proxy.py --forward
 如果已有历史日志需要按照新的分类规则整理：
 
 ```bash
+# 同步模式（默认）
 python reorganize.py <历史日志文件> <输出目录>
+
+# 异步模式（处理大文件更快）
+python reorganize.py <历史日志文件> <输出目录> --async
 ```
 
 ## 配置要求
@@ -91,6 +96,32 @@ python reorganize.py <历史日志文件> <输出目录>
 - **60007/80007**: 链接消息（公众号文章等）
 - **60014/80014**: 引用消息
 
+## 工具函数
+
+### JSON解析工具 (`json_parser.py`)
+
+提供异步和同步的多行JSON解析功能，可以处理格式化的多行JSON文件：
+
+```python
+# 异步解析
+from json_parser import parse_multiline_json_objects_async
+
+async for obj in parse_multiline_json_objects_async('data.jsonl'):
+    print(obj.get('messageType'))
+
+# 同步解析  
+from json_parser import parse_multiline_json_objects_sync
+
+for obj in parse_multiline_json_objects_sync('data.jsonl'):
+    print(obj.get('messageType'))
+```
+
+特点：
+- 正确处理嵌套的JSON对象
+- 自动跳过解析失败的对象
+- 支持大文件异步处理
+- 提供处理进度反馈
+
 ## 注意事项
 
 1. **首次使用**: 需要扫码登录微信
@@ -98,3 +129,8 @@ python reorganize.py <历史日志文件> <输出目录>
 3. **群组白名单**: 只有白名单中的群组消息会被处理
 4. **日志增长**: 长期运行会产生大量日志文件，注意磁盘空间
 
+## 历史变更
+
+- **目录重命名**: 从 `message/` 更名为 `wechat/`，更准确地反映了模块的功能范围
+- **异步解析器**: 新增 `json_parser.py` 工具模块，支持异步解析多行JSON文件
+- **异步整理**: `reorganize.py` 新增 `--async` 参数，使用异步模式处理大文件更高效

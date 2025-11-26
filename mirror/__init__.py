@@ -1,0 +1,9 @@
+"""
+MirrorWe (HuixiangDou3) - 微信智能助手
+
+一个基于大语言模型的微信智能助手，支持消息处理、智能回复和日志管理。
+"""
+
+__version__ = "3.0.0"
+__author__ = "tpoisonooo"
+__description__ = "微信智能助手，基于大语言模型"
