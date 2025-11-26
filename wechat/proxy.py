@@ -14,14 +14,15 @@ from datetime import datetime
 from multiprocessing import Process
 from typing import List
 
-import redis
 import asyncio
 import requests
 from aiohttp import web
 from bs4 import BeautifulSoup as BS
 from loguru import logger
 from readability import Document
+from dotenv import load_dotenv
 
+load_dotenv()
 
 def get_env_or_raise(key: str) -> str:
     """Get environment variable or raise exception."""
@@ -49,65 +50,6 @@ def get_env_with_default(key: str, default: any) -> any:
         except ValueError:
             return default
     return value
-
-
-class Queue:
-
-    def __init__(self, name, namespace='HuixiangDou', **redis_kwargs):
-        self.__db = redis.Redis(host=get_env_or_raise('REDIS_HOST'),
-                                port=int(get_env_with_default('REDIS_PORT', 6379)),
-                                password=get_env_or_raise('REDIS_PASSWORD'),
-                                charset='utf-8',
-                                decode_responses=True)
-        self.key = '%s:%s' % (namespace, name)
-        print(self.qsize())
-
-    def qsize(self):
-        """Return the approximate size of the queue."""
-        return self.__db.llen(self.key)
-
-    def empty(self):
-        """Return True if the queue is empty, False otherwise."""
-        return self.qsize() == 0
-
-    def put(self, item):
-        """Put item into the queue."""
-        self.__db.rpush(self.key, item)
-
-    def peek_tail(self):
-        return self.__db.lrange(self.key, -1, -1)
-
-    def get(self, block=True, timeout=None):
-        """Remove and return an item from the queue.
-
-        If optional args block is true and timeout is None (the default), block
-        if necessary until an item is available.
-        """
-        if block:
-            item = self.__db.blpop(self.key, timeout=timeout)
-        else:
-            item = self.__db.lpop(self.key)
-
-        if item:
-            item = item[1]
-        return item
-
-    def get_all(self):
-        """Get add messages in queue without block."""
-        ret = []
-        try:
-            while len(ret) < 1:  # batchsize = 1 for debugging
-                item = self.__db.lpop(self.key)
-                if not item:
-                    break
-                ret.append(item)
-        except Exception as e:
-            logger.error(str(e))
-        return ret
-
-    def get_nowait(self):
-        """Equivalent to get(False)."""
-        return self.get(False)
 
 
 def is_revert_command(wx_msg: dict):
@@ -835,20 +777,12 @@ class WkteamManager:
             priority."""
             input_json = await request.json()
 
-
             with open(logpath, 'a') as f:
                 json_str = json.dumps(input_json, indent=2, ensure_ascii=False)
                 f.write(json_str)
                 f.write('\n')
 
             logger.debug(input_json)
-            try:
-                msg_que = Queue(name='wechat')
-            except Exception as e:
-                msg_que = None
-                print('redis unavailable')
-                pass
-
             if input_json['messageType'] == '00000':
                 return web.json_response(text='done')
 
@@ -857,9 +791,6 @@ class WkteamManager:
                 if is_revert_command(input_json):
                     self.revert_all()
                     return web.json_response(text='done')
-
-                if msg_que:
-                    msg_que.put(json_str)
 
                 if forward and not is_revert_command(input_json):
                     await forward_msg(input_json)
@@ -1004,3 +935,35 @@ class WkteamManager:
                         user.update_history(query, resp, refs)
 
             await asyncio.sleep(1)
+
+def parse_args():
+    """Parse args."""
+    parser = argparse.ArgumentParser(description='wechat server.')
+    parser.add_argument('--login',
+                        action='store_true',
+                        default=False,
+                        help='Login wkteam')
+    parser.add_argument('--serve',
+                        action='store_true',
+                        default=True,
+                        help='Bind port and listen WeChat message callback')
+    parser.add_argument('--forward',
+                        action='store_true',
+                        default=False,
+                        help='Forward all message to all groups')
+    args = parser.parse_args()
+    return args
+
+
+if __name__ == '__main__':
+    args = parse_args()
+    manager = WkteamManager()
+
+    if args.login:
+        err = manager.login()
+        if err is not None:
+            logger.error(err)
+        manager.set_callback()
+
+    if args.serve:
+        manager.serve(forward=args.forward)
