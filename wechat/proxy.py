@@ -99,6 +99,7 @@ class Message:
         self.md5 = ''
         self.length = 0
         self.new_msg_id = ''
+        self.self_msg = False
 
     def parse(self, wx_msg: dict, bot_wxid: str, auth:str='', wkteam_ip_port:str=''):
         # str or int
@@ -114,7 +115,7 @@ class Message:
 
         if 'self' in data:
             if data['self']:
-                return Exception('self msg, return')
+                self.self_msg = True
 
         if 'msgId' in data:
             self._id = data['msgId']
@@ -361,11 +362,11 @@ class WkteamManager:
         self._load_group_whitelist()
 
         # load wkteam license
-        wkteam_dir = get_env_or_raise('WKTEAM_DIR')
+        wkteam_dir = get_env_or_raise('WKTEAM_DATA')
         if not os.path.exists(wkteam_dir):
             os.makedirs(wkteam_dir)
-        self.license_path = os.path.join(wkteam_dir, 'license.json')
-        self.record_path = os.path.join(wkteam_dir, 'record.jsonl')
+        
+        self.license_path = get_env_or_raise('WKTEAM_LICENSE')
         if os.path.exists(self.license_path):
             with open(self.license_path) as f:
                 jsonobj = json.load(f)
@@ -501,7 +502,7 @@ class WkteamManager:
         url = ''
         path = ''
         try:
-            wkteam_dir = get_env_or_raise('WKTEAM_DIR')
+            wkteam_dir = get_env_or_raise('WKTEAM_DATA')
             url, path = download(data, headers, wkteam_dir)
         except Exception as e:
             logger.error(str(e))
@@ -720,10 +721,56 @@ class WkteamManager:
     def bind(self, logdir: str, port: int, forward:bool=False):
         if not os.path.exists(logdir):
             os.makedirs(logdir)
-        logpath = os.path.join(logdir, 'message.jsonl')
+        
+        # 原始消息日志文件路径
+        origin_logpath = os.path.join(logdir, 'origin.jsonl')
+        
+        def save_message_to_file(file_path: str, message: dict):
+            """保存消息到指定的jsonl文件"""
+            try:
+                with open(file_path, 'a', encoding='utf-8') as f:
+                    json_str = json.dumps(message, indent=2, ensure_ascii=False)
+                    f.write(json_str + '\n')
+            except Exception as e:
+                logger.error(f"保存消息到文件失败 {file_path}: {str(e)}")
+        
+        def get_message_log_path(message_type: str, sender_id: str, group_id: str = '') -> str:
+            """根据消息类型和发送者获取对应的日志文件路径"""
+            try:
+                # 私聊消息 (600开头)
+                if message_type.startswith('6'):
+                    # 为每个好友创建目录
+                    friend_dir = os.path.join(logdir, 'friends', sender_id)
+                    if not os.path.exists(friend_dir):
+                        os.makedirs(friend_dir)
+                    return os.path.join(friend_dir, 'message.jsonl')
+                
+                # 群聊消息 (800开头)
+                elif message_type.startswith('8'):
+                    # 为每个群创建目录
+                    group_dir = os.path.join(logdir, 'groups', group_id)
+                    if not os.path.exists(group_dir):
+                        os.makedirs(group_dir)
+                    return os.path.join(group_dir, 'message.jsonl')
+                
+                # 其他类型的消息，保存在原始日志目录
+                else:
+                    other_dir = os.path.join(logdir, 'others')
+                    if not os.path.exists(other_dir):
+                        os.makedirs(other_dir)
+                    return os.path.join(other_dir, 'message.jsonl')
+                    
+            except Exception as e:
+                logger.error(f"获取消息日志路径失败: {str(e)}")
+                # 如果出错，返回一个默认路径
+                default_dir = os.path.join(logdir, 'default')
+                if not os.path.exists(default_dir):
+                    os.makedirs(default_dir)
+                return os.path.join(default_dir, 'message.jsonl')
 
         async def forward_msg(input_json: dict):
             msg = Message()
+
             print(input_json)
             err = msg.parse(wx_msg=input_json, bot_wxid=self.wId, auth=self.auth, wkteam_ip_port=self.WKTEAM_IP_PORT)
             if err is not None:
@@ -777,10 +824,31 @@ class WkteamManager:
             priority."""
             input_json = await request.json()
 
-            with open(logpath, 'a') as f:
-                json_str = json.dumps(input_json, indent=2, ensure_ascii=False)
-                f.write(json_str)
-                f.write('\n')
+            # 1. 首先记录原始消息到 origin.jsonl
+            save_message_to_file(origin_logpath, input_json)
+
+            # 2. 根据消息类型分别记录到对应的文件
+            try:
+                message_type = str(input_json.get('messageType', ''))
+                data = input_json.get('data', {})
+                
+                if data and type(data) is dict and message_type:
+                    if 'self' in data and data['self']:
+                        # 私聊消息，不记录分类日志
+                        sender_id = data.get('toUser', '')
+                    else:
+                        sender_id = data.get('fromUser', '')
+            
+                    group_id = data.get('fromGroup', '')
+                    
+                    # 获取对应的消息日志文件路径
+                    specific_logpath = get_message_log_path(message_type, sender_id, group_id)
+                    
+                    # 保存到对应的分类日志文件
+                    save_message_to_file(specific_logpath, input_json)
+                    
+            except Exception as e:
+                logger.error(f"分类保存消息失败: {str(e)}")
 
             logger.debug(input_json)
             if input_json['messageType'] == '00000':
@@ -805,7 +873,7 @@ class WkteamManager:
         web.run_app(app, host='0.0.0.0', port=port)
 
     def serve(self, forward:bool=False):
-        wkteam_dir = get_env_or_raise('WKTEAM_DIR')
+        wkteam_dir = get_env_or_raise('WKTEAM_DATA')
         callback_port = int(get_env_or_raise('WKTEAM_CALLBACK_PORT'))
         p = Process(target=self.bind, args=(wkteam_dir, callback_port, forward))
         p.start()

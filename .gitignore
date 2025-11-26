@@ -32,3 +32,8 @@ coverage.xml
 logs/
 workdir/
 wkteam
+wechat/friends/
+wechat/groups/
+wechat/others/
+wechat/origin.jsonl
+
