@@ -12,7 +12,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from multiprocessing import Process
-from typing import List
+from typing import List, Union
 
 import asyncio
 import requests
@@ -105,13 +105,7 @@ class Message:
         # str or int
         msg_type = wx_msg['messageType']
         parse_type = 'unknown'
-        if 'data' not in wx_msg:
-            self.status = 'skip'
-            return Exception('data not in wx_msg')
-
-        data = wx_msg['data']
-        if not data:
-            return Exception('data is None')
+        data = wx_msg.get('data', {})
 
         if 'self' in data:
             if data['self']:
@@ -122,19 +116,14 @@ class Message:
 
         # format user input
         query = ''
-        if 'atlist' in data:
-            atlist = data['atlist']
-            if bot_wxid not in atlist:
-                self.status = 'skip'
-                return Exception('atlist not contains bot')
-
-        content = data['content'] if 'content' in data else ''
+        atlist = data.get('atlist', [])
+        content = data.get('content', '')
         if msg_type in ['80014', '60014']:
             # ref message
             # 群、私聊引用消息
-            query = data['title']
+            query = data.get('title', '')
 
-            root = ET.fromstring(data['content'])
+            root = ET.fromstring(data.get('content', ''))
 
             def search_key(xml_key: str):
                 elements = root.findall('.//{}'.format(xml_key))
@@ -161,7 +150,7 @@ class Message:
             # 例如公众号文章。尝试解析提取内容，这个行为高概率会被服务器 ban
             parse_type = 'link'
 
-            root = ET.fromstring(data['content'])
+            root = ET.fromstring(data.get('content', ''))
 
             def search_key(xml_key: str):
                 elements = root.findall('.//{}'.format(xml_key))
@@ -725,12 +714,16 @@ class WkteamManager:
         # 原始消息日志文件路径
         origin_logpath = os.path.join(logdir, 'origin.jsonl')
         
-        def save_message_to_file(file_path: str, message: dict):
+        def save_message_to_file(file_paths: Union[List[str],str], message: dict):
             """保存消息到指定的jsonl文件"""
+            if isinstance(file_paths, str):
+                file_paths = [file_paths]
             try:
-                with open(file_path, 'a', encoding='utf-8') as f:
-                    json_str = json.dumps(message, indent=2, ensure_ascii=False)
-                    f.write(json_str + '\n')
+                json_str = json.dumps(message, indent=2, ensure_ascii=False)
+                for file_path in file_paths:
+                    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                    with open(file_path, 'a', encoding='utf-8') as f:
+                        f.write(json_str + '\n')
             except Exception as e:
                 logger.error(f"保存消息到文件失败 {file_path}: {str(e)}")
         
@@ -751,8 +744,10 @@ class WkteamManager:
                     group_dir = os.path.join(logdir, 'groups', group_id)
                     if not os.path.exists(group_dir):
                         os.makedirs(group_dir)
-                    return os.path.join(group_dir, 'message.jsonl')
                 
+                    paths = [os.path.join(group_dir, 'message.jsonl'), os.path.join(logdir, 'friends', sender_id, 'group_segment.jsonl')]
+                    return paths
+
                 # 其他类型的消息，保存在原始日志目录
                 else:
                     other_dir = os.path.join(logdir, 'others')
@@ -829,6 +824,7 @@ class WkteamManager:
 
             # 2. 根据消息类型分别记录到对应的文件
             try:
+                    
                 message_type = str(input_json.get('messageType', ''))
                 data = input_json.get('data', {})
                 
@@ -840,12 +836,11 @@ class WkteamManager:
                         sender_id = data.get('fromUser', '')
             
                     group_id = data.get('fromGroup', '')
-                    
                     # 获取对应的消息日志文件路径
-                    specific_logpath = get_message_log_path(message_type, sender_id, group_id)
+                    specific_logpaths = get_message_log_path(message_type, sender_id, group_id)
                     
                     # 保存到对应的分类日志文件
-                    save_message_to_file(specific_logpath, input_json)
+                    save_message_to_file(specific_logpaths, input_json)
                     
             except Exception as e:
                 logger.error(f"分类保存消息失败: {str(e)}")

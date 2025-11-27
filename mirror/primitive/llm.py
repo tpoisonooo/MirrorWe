@@ -72,11 +72,6 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 backend2url = {
     "kimi": "https://api.moonshot.cn/v1",
-    "step": "https://api.stepfun.com/v1",
-    'xi-api': 'https://api.xi-ai.cn/v1',
-    'deepseek': 'https://api.deepseek.com/v1',
-    'zhipuai': 'https://open.bigmodel.cn/api/paas/v4/',
-    'puyu': 'https://puyu.openxlab.org.cn/puyu/api/v1/',
     'siliconcloud': 'https://api.siliconflow.cn/v1',
     'aliyun': 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     'local': 'http://198.11.18.24:3000/v1'
@@ -84,14 +79,10 @@ backend2url = {
 
 backend2model = {
     "kimi": "auto",
-    "step": "auto",
-    "deepseek": "deepseek-chat",
-    "zhipuai": "glm-4",
-    "puyu": "internlm2-latest",
     "siliconcloud": "Qwen/Qwen2.5-14B-Instruct",
-    "aliyun": "qwen3-30b-a3b-instruct-2507"
+    "aliyun": "qwen3-30b-a3b-instruct-2507",
+    "local": "vllm"
 }
-
 
 def limit_async_func_call(max_size: int, waitting_time: float = 0.1):
     """Add restriction of maximum async calling times for a async func"""
@@ -123,9 +114,8 @@ class Backend:
         if self.max_token_size < 0:
             raise Exception(f'{self.max_token_size} < 4096')
         self.rpm = RPM(int(data.get('rpm', 500)))
-        self.tpm = TPM(int(data.get('tpm', 20000)))
+        self.tpm = TPM(int(data.get('tpm', 200000)))
         self.name = name
-        self.port = int(data.get('port', 23333))
         self.model = data.get('model', '')
         self.base_url = data.get('base_url', '')
         if not self.base_url and name in backend2url:
