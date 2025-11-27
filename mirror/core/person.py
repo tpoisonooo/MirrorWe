@@ -33,7 +33,7 @@ class Person(ABC):
         self.TAG_YOU = "对方"
         self.TAG_ME = "我"
         current_file = inspect.getfile(self.__class__)
-        data_dir = os.path.join(os.path.dirname(current_file), "..", "..", "data", self.wxid)
+        data_dir = os.path.join(os.path.dirname(current_file), "..", "..", "data")
         self.wxid_dir = os.path.join(data_dir, 'friends', self.wxid)
 
     async def initialize(self):
