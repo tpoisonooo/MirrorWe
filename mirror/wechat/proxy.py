@@ -21,36 +21,8 @@ from bs4 import BeautifulSoup as BS
 from loguru import logger
 from readability import Document
 from dotenv import load_dotenv
-
-load_dotenv()
-
-def get_env_or_raise(key: str) -> str:
-    """Get environment variable or raise exception."""
-    value = os.getenv(key)
-    if not value:
-        raise Exception(f'{key} not configured')
-    return value
-
-
-def get_env_with_default(key: str, default: any) -> any:
-    """Get environment variable with default value."""
-    value = os.getenv(key)
-    if value is None:
-        return default
-    
-    # Try to convert to appropriate type
-    if isinstance(default, int):
-        try:
-            return int(value)
-        except ValueError:
-            return default
-    elif isinstance(default, float):
-        try:
-            return float(value)
-        except ValueError:
-            return default
-    return value
-
+from ..primitive import get_env_or_raise, get_env_with_default
+from .cookie import Cookie
 
 def is_revert_command(wx_msg: dict):
     """Is wx_msg a revert command."""
@@ -241,7 +213,6 @@ class Talk:
     refs: tuple = ()
     now: float = field(default_factory=time.time)
 
-
 def convert_talk_to_dict(talk: Talk):
     return {
         'query': talk.query,
@@ -328,7 +299,6 @@ class User:
         self.last_process_time = time.time()
 
 
-
 class WkteamManager:
     """
     1. wkteam Login, see http://121.229.29.88:6327/
@@ -337,11 +307,8 @@ class WkteamManager:
 
     def __init__(self):
         """init with environment variables."""
-        self.WKTEAM_IP_PORT = '121.229.29.88:9899'
-        self.auth = ''
-        self.wId = ''
-        self.wcId = ''
-        self.qrCodeUrl = ''
+
+        self.cookie = Cookie()
         self.users = dict()
         self.preprocessed = set()
         self.messages = []
@@ -354,39 +321,10 @@ class WkteamManager:
         wkteam_dir = get_env_or_raise('WKTEAM_DATA')
         if not os.path.exists(wkteam_dir):
             os.makedirs(wkteam_dir)
-        
-        self.license_path = get_env_or_raise('WKTEAM_LICENSE')
-        if os.path.exists(self.license_path):
-            with open(self.license_path) as f:
-                jsonobj = json.load(f)
-                self.auth = jsonobj['auth']
-                self.wId = jsonobj['wId']
-                self.wcId = jsonobj['wcId']
-                self.qrCodeUrl = jsonobj['qrCodeUrl']
-                logger.debug(jsonobj)
 
         # messages sent
         # {groupId: [wx_msg]}
         self.sent_msg = dict()
-        self.debug()
-
-    def _load_group_whitelist(self):
-        """Load group whitelist from environment variables."""
-        # Load groups from environment variables with format GROUP_ID_GROUPNAME
-        for key, value in os.environ.items():
-            if key.startswith('GROUP_'):
-                group_id = key.replace('GROUP_', '') + '@chatroom'
-                self.group_whitelist[group_id] = value
-                logger.debug(f"Loaded group: {group_id} -> {value}")
-
-    def debug(self):
-        logger.debug('auth {}'.format(self.auth))
-        logger.debug('wId {}'.format(self.wId))
-        logger.debug('wcId {}'.format(self.wcId))
-
-        logger.debug('REDIS_HOST {}'.format(os.getenv('REDIS_HOST')))
-        logger.debug('REDIS_PORT {}'.format(os.getenv('REDIS_PORT')))
-        logger.debug(self.group_whitelist)
 
     def post(self, url, data, headers):
         """Wrap http post and error handling."""
@@ -427,11 +365,11 @@ class WkteamManager:
                 # real revert
                 headers = {
                     'Content-Type': 'application/json',
-                    'Authorization': self.auth
+                    'Authorization': self.cookie.auth
                 }
 
                 self.post(url='http://{}/revokeMsg'.format(
-                    self.WKTEAM_IP_PORT),
+                    self.cookie.WKTEAM_IP_PORT),
                           data=sent,
                           headers=headers)
         del self.sent_msg[groupId]
@@ -442,13 +380,13 @@ class WkteamManager:
         msgId = param['msgId']
         wId = param['wId']
 
-        if len(self.auth) < 1:
+        if len(self.cookie.auth) < 1:
             logger.error('Authentication empty')
             return
 
         headers = {
             'Content-Type': 'application/json',
-            'Authorization': self.auth
+            'Authorization': self.cookie.auth
         }
         data = {'wId': wId, 'content': content, 'msgId': msgId, 'type': 0}
 
@@ -460,7 +398,7 @@ class WkteamManager:
 
         def download(data: dict, headers: dict, dir: str):
             resp = requests.post('http://{}/getMsgImg'.format(
-                self.WKTEAM_IP_PORT),
+                self.cookie.WKTEAM_IP_PORT),
                                  data=json.dumps(data),
                                  headers=headers)
             json_str = resp.content.decode('utf8')
@@ -502,23 +440,6 @@ class WkteamManager:
 
     def login(self):
         """user login, need scan qr code on mobile phone."""
-        # check input
-        account = get_env_or_raise('WKTEAM_ACCOUNT')
-        password = get_env_or_raise('WKTEAM_PASSWORD')
-        callback_ip = get_env_or_raise('WKTEAM_CALLBACK_IP')
-        proxy = int(get_env_or_raise('WKTEAM_PROXY'))
-        
-        if len(account) < 1 or len(password) < 1:
-            return Exception('wkteam account or password not set')
-
-        if len(callback_ip) < 1:
-            return Exception(
-                'wkteam wechat message public callback ip not set, try FRP or buy cloud service ?'
-            )
-
-        if proxy <= 0:
-            return Exception('wkteam proxy not set')
-
         # auth
         headers = {'Content-Type': 'application/json'}
         data = {
@@ -527,25 +448,25 @@ class WkteamManager:
         }
 
         json_obj, err = self.post(url='http://{}/member/login'.format(
-            self.WKTEAM_IP_PORT),
+            self.cookie.WKTEAM_IP_PORT),
                                   data=data,
                                   headers=headers)
         if err is not None:
             return err
-        self.auth = json_obj['data']['Authorization']
+        self.cookie.auth = json_obj['data']['Authorization']
 
         # ipadLogin
-        headers['Authorization'] = self.auth
-        data = {'wcId': '', 'proxy': proxy}
+        headers['Authorization'] = self.cookie.auth
+        data = {'wcId': '', 'proxy': self.cookie.proxy}
         json_obj, err = self.post(url='http://{}/iPadLogin'.format(
-            self.WKTEAM_IP_PORT),
+            self.cookie.WKTEAM_IP_PORT),
                                   data=data,
                                   headers=headers)
         if err is not None:
             return err
 
         x = json_obj['data']
-        self.wId = x['wId']
+        self.cookie.wId = x['wId']
         self.qrCodeUrl = x['qrCodeUrl']
 
         logger.info(
@@ -554,19 +475,19 @@ class WkteamManager:
 
         # getLoginInfo
         json_obj, err = self.post(url='http://{}/getIPadLoginInfo'.format(
-            self.WKTEAM_IP_PORT),
-                                  data={'wId': self.wId},
+            self.cookie.WKTEAM_IP_PORT),
+                                  data={'wId': self.cookie.wId},
                                   headers=headers)
         x = json_obj['data']
-        self.wcId = x['wcId']
+        self.cookie.wcId = x['wcId']
 
         # dump
         with open(self.license_path, 'w') as f:
             json_str = json.dumps(
                 {
-                    'auth': self.auth,
-                    'wId': self.wId,
-                    'wcId': self.wcId,
+                    'auth': self.cookie.auth,
+                    'wId': self.cookie.wId,
+                    'wcId': self.cookie.wcId,
                     'qrCodeUrl': self.qrCodeUrl
                 },
                 indent=2,
@@ -581,12 +502,12 @@ class WkteamManager:
         logger.debug('set callback url {}'.format(httpUrl))
         headers = {
             'Content-Type': 'application/json',
-            'Authorization': self.auth
+            'Authorization': self.cookie.auth
         }
         data = {'httpUrl': httpUrl, 'type': 2}
 
         json_obj, err = self.post(url='http://{}/setHttpCallbackUrl'.format(
-            self.WKTEAM_IP_PORT),
+            self.cookie.WKTEAM_IP_PORT),
                                   data=data,
                                   headers=headers)
         if err is not None:
@@ -599,17 +520,17 @@ class WkteamManager:
     def send_image(self, groupId: str, image_url: str):
         headers = {
             'Content-Type': 'application/json',
-            'Authorization': self.auth
+            'Authorization': self.cookie.auth
         }
-        data = {'wId': self.wId, 'wcId': groupId, 'content': image_url}
+        data = {'wId': self.cookie.wId, 'wcId': groupId, 'content': image_url}
 
         json_obj, err = self.post(url='http://{}/sendImage2'.format(
-            self.WKTEAM_IP_PORT), data=data, headers=headers)
+            self.cookie.WKTEAM_IP_PORT), data=data, headers=headers)
         if err is not None:
             return err
 
         sent = json_obj['data']
-        sent['wId'] = self.wId
+        sent['wId'] = self.cookie.wId
         if groupId not in self.sent_msg:
             self.sent_msg[groupId] = [sent]
         else:
@@ -620,17 +541,17 @@ class WkteamManager:
     def send_emoji(self, groupId: str, md5: str, length: int):
         headers = {
             'Content-Type': 'application/json',
-            'Authorization': self.auth
+            'Authorization': self.cookie.auth
         }
-        data = {'wId': self.wId, 'wcId': groupId, 'imageMd5': md5, 'imgSize': length}
+        data = {'wId': self.cookie.wId, 'wcId': groupId, 'imageMd5': md5, 'imgSize': length}
 
         json_obj, err = self.post(url='http://{}/sendEmoji'.format(
-            self.WKTEAM_IP_PORT), data=data, headers=headers)
+            self.cookie.WKTEAM_IP_PORT), data=data, headers=headers)
         if err is not None:
             return err
 
         sent = json_obj['data']
-        sent['wId'] = self.wId
+        sent['wId'] = self.cookie.wId
         if groupId not in self.sent_msg:
             self.sent_msg[groupId] = [sent]
         else:
@@ -641,19 +562,19 @@ class WkteamManager:
     def send_message(self, groupId: str, text: str):
         headers = {
             'Content-Type': 'application/json',
-            'Authorization': self.auth
+            'Authorization': self.cookie.auth
         }
-        data = {'wId': self.wId, 'wcId': groupId, 'content': text}
+        data = {'wId': self.cookie.wId, 'wcId': groupId, 'content': text}
 
         json_obj, err = self.post(url='http://{}/sendText'.format(
-            self.WKTEAM_IP_PORT),
+            self.cookie.WKTEAM_IP_PORT),
                                   data=data,
                                   headers=headers)
         if err is not None:
             return err
 
         sent = json_obj['data']
-        sent['wId'] = self.wId
+        sent['wId'] = self.cookie.wId
         if groupId not in self.sent_msg:
             self.sent_msg[groupId] = [sent]
         else:
@@ -664,19 +585,19 @@ class WkteamManager:
     def send_user_message(self, userId: str, text: str):
         headers = {
             'Content-Type': 'application/json',
-            'Authorization': self.auth
+            'Authorization': self.cookie.auth
         }
-        data = {'wId': self.wId, 'wcId': userId, 'content': text}
+        data = {'wId': self.cookie.wId, 'wcId': userId, 'content': text}
 
         json_obj, err = self.post(url='http://{}/sendText'.format(
-            self.WKTEAM_IP_PORT),
+            self.cookie.WKTEAM_IP_PORT),
                                   data=data,
                                   headers=headers)
         if err is not None:
             return err
 
         sent = json_obj['data']
-        sent['wId'] = self.wId
+        sent['wId'] = self.cookie.wId
         if userId not in self.sent_msg:
             self.sent_msg[userId] = [sent]
         else:
@@ -687,19 +608,19 @@ class WkteamManager:
     def send_url(self, groupId: str, description: str, title: str, thumb_url: str, url: str):
         headers = {
             'Content-Type': 'application/json',
-            'Authorization': self.auth
+            'Authorization': self.cookie.auth
         }
-        data = {'wId': self.wId, 'wcId': groupId, 'description': description, 'title':title, 'thumbUrl':thumb_url, 'url':url}
+        data = {'wId': self.cookie.wId, 'wcId': groupId, 'description': description, 'title':title, 'thumbUrl':thumb_url, 'url':url}
 
         json_obj, err = self.post(url='http://{}/sendUrl'.format(
-            self.WKTEAM_IP_PORT),
+            self.cookie.WKTEAM_IP_PORT),
                                   data=data,
                                   headers=headers)
         if err is not None:
             return err
 
         sent = json_obj['data']
-        sent['wId'] = self.wId
+        sent['wId'] = self.cookie.wId
         if groupId not in self.sent_msg:
             self.sent_msg[groupId] = [sent]
         else:
@@ -767,7 +688,7 @@ class WkteamManager:
             msg = Message()
 
             print(input_json)
-            err = msg.parse(wx_msg=input_json, bot_wxid=self.wId, auth=self.auth, wkteam_ip_port=self.WKTEAM_IP_PORT)
+            err = msg.parse(wx_msg=input_json, bot_wxid=self.cookie.wcId, auth=self.cookie.auth, wkteam_ip_port=self.cookie.WKTEAM_IP_PORT)
             if err is not None:
                 logger.error(str(err))
                 return
@@ -788,7 +709,7 @@ class WkteamManager:
             if not come_from_whitelist:
                 return
 
-            if msg.sender == self.wcId:
+            if msg.sender == self.cookie.wcId:
                 # self message, skip
                 return
             

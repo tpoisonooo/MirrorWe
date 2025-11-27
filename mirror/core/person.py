@@ -36,7 +36,6 @@ class Person(ABC):
         data_dir = os.path.join(os.path.dirname(current_file), "..", "..", "data", self.wxid)
         self.wxid_dir = os.path.join(data_dir, 'friends', self.wxid)
 
-
     async def initialize(self):
         # 尝试加载本地消息数据
         await self._load_local_messages()
@@ -50,7 +49,7 @@ class Person(ABC):
                 logger.info(f"Person {self.wxid}: 加载了 {len(self.memory)} 条消息，完成个性分析")
             else:
                 logger.info(f"Person {self.wxid}: 没有找到本地消息数据，使用默认个性")
-            
+        
         # TODO 并行化
         await analysis()
         await self.brief_bio()
@@ -66,7 +65,10 @@ class Person(ABC):
             except Exception as e:
                 logger.error(f"读取 bio.md 失败: {e}")
                 
-        prompt = FRIEND_BIO.format(bio=bio,text=json.dumps(self.analysis_result, ensure_ascii=False, indent=2))
+        prompt = FRIEND_BIO.format(
+            bio=bio,
+            private=json.dumps(self.memory.private, ensure_ascii=False, indent=2), 
+            group=json.dumps(self.memory.group, ensure_ascii=False, indent=2))
         self.bio = await llm.chat(prompt)
         with open(bio_path, "w", encoding="utf-8") as f:
             f.write(bio)

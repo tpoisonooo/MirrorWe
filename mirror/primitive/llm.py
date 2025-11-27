@@ -22,6 +22,7 @@ import uuid
 import hashlib
 
 from .db import DB
+from .utils import get_env_or_raise, get_env_with_default
 
 class ChatCache:
     def __init__(self, file_path: str = '.cache_llm'):
@@ -78,7 +79,7 @@ backend2url = {
 }
 
 backend2model = {
-    "kimi": "auto",
+    "kimi": "kimi-k2-turbo-preview",
     "siliconcloud": "Qwen/Qwen2.5-14B-Instruct",
     "aliyun": "qwen3-30b-a3b-instruct-2507",
     "local": "vllm"
@@ -108,18 +109,19 @@ def limit_async_func_call(max_size: int, waitting_time: float = 0.1):
 
 class Backend:
 
-    def __init__(self, name: str, data: Dict):
-        self.api_key = data.get('api_key', '')
-        self.max_token_size = data.get('max_token_size', 32000) - 4096
-        if self.max_token_size < 0:
-            raise Exception(f'{self.max_token_size} < 4096')
-        self.rpm = RPM(int(data.get('rpm', 500)))
-        self.tpm = TPM(int(data.get('tpm', 200000)))
-        self.name = name
-        self.model = data.get('model', '')
-        self.base_url = data.get('base_url', '')
-        if not self.base_url and name in backend2url:
-            self.base_url = backend2url[name]
+    def __init__(self):
+        self.api_key = get_env_or_raise('LLM_API_KEY')
+        self.max_token_size = int(get_env_or_raise('LLM_MAX_TOKEN_SIZE'))
+        self.rpm = RPM(int(get_env_or_raise('LLM_RPM')))
+        self.tpm = TPM(int(get_env_or_raise('LLM_TPM')))
+        self.name = get_env_with_default('LLM_TYPE', 'kimi')
+        self.base_url =  get_env_with_default('LLM_BASE_URL', '')
+        self.model = get_env_with_default('LLM_MODEL', '')
+        # 如果没填，尝试按名字给个默认值
+        if not self.base_url and self.name in backend2url:
+            self.base_url = backend2url[self.name]
+        if not self.model and self.name in backend2model:
+            self.model = backend2model[self.name]
 
     def jsonify(self):
         return {"api_key": self.name, "model": self.model}
@@ -129,49 +131,12 @@ class Backend:
 
 class LLM:
 
-    def __init__(self, config_path: str):
+    def __init__(self):
         """Initialize the LLM with the path of the configuration file."""
-        self.config_path = config_path
-        self.llm_config = None
-        self.backends = dict()
+        self.backend = Backend()
         self.sum_input_token_size = 0
         self.sum_output_token_size = 0
-        with open(self.config_path, encoding='utf8') as f:
-            config = pytoml.load(f)
-            self.llm_config = config['llm']
-
-            for key, value in self.llm_config.items():
-                self.backends[key] = Backend(name=key, data=value)
         self.cache = ChatCache()
-
-    def choose_model(self, backend: Backend, token_size: int) -> str:
-        if backend.model is not None and len(backend.model) > 0:
-            return backend.model
-
-        model = ''
-        if backend.name == 'kimi':
-            if token_size <= 8192 - 1024:
-                model = 'moonshot-v1-8k'
-            elif token_size <= 32768 - 1024:
-                model = 'moonshot-v1-32k'
-            elif token_size <= 128000 - 1024:
-                model = 'moonshot-v1-128k'
-            else:
-                raise ValueError('Input token length exceeds 128k')
-        elif backend.name == 'step':
-            if token_size <= 8192 - 1024:
-                model = 'step-1-8k'
-            elif token_size <= 32768 - 1024:
-                model = 'step-1-32k'
-            elif token_size <= 128000 - 1024:
-                model = 'step-1-128k'
-            elif token_size <= 256000 - 1024:
-                model = 'step-1-256k'
-            else:
-                raise ValueError('Input token length exceeds 256k')
-        else:
-            model = backend2model[backend.name]
-        return model
 
     @retry(
         stop=stop_after_attempt(3),
@@ -182,41 +147,32 @@ class LLM:
     @limit_async_func_call(16)
     async def chat(self,
                    prompt: str,
-                   backend: str = 'default',
                    system_prompt=None,
                    history=[],
                    allow_truncate=False,
                    max_tokens=8192,
                    timeout=600,
                    enable_cache:bool=True) -> str:
-        
-        # choose backend
-        # if user not specify model, use first one
-        if backend == 'default':
-            backend = list(self.backends.keys())[0]
-        
         if enable_cache:
-            r = self.cache.get(query=prompt, backend=backend)
+            r = self.cache.get(query=prompt, backend=self.backend.name)
             if r is not None:
                 logger.info('LLM cache hit')
                 return r
         
-        instance = self.backends[backend]
-
         # try truncate input prompt
         input_tokens = encode_string(content=prompt)
         input_token_size = len(input_tokens)
-        if input_token_size > instance.max_token_size:
+        if input_token_size > self.backend.max_token_size:
             if not allow_truncate:
                 raise Exception(
-                    f'input token size {input_token_size}, max {instance.max_token_size}'
+                    f'input token size {input_token_size}, max {self.backend.max_token_size}'
                 )
 
-            tokens = input_tokens[0:instance.max_token_size - input_token_size]
+            tokens = input_tokens[0:self.backend.max_token_size - input_token_size]
             prompt = decode_tokens(tokens=tokens)
             input_token_size = len(tokens)
 
-        await instance.tpm.wait(token_count=input_token_size)
+        await self.backend.tpm.wait(token_count=input_token_size)
 
         # build messages
         messages = []
@@ -227,18 +183,14 @@ class LLM:
 
         content = ''
         # try:
-        model = self.choose_model(backend=instance,
-                                  token_size=input_token_size)
-        openai_async_client = AsyncOpenAI(base_url=instance.base_url,
-                                          api_key=instance.api_key,
+        openai_async_client = AsyncOpenAI(base_url=self.backend.base_url,
+                                          api_key=self.backend.api_key,
                                           timeout=timeout)
         # response = await openai_async_client.chat.completions.create(model=model, messages=messages, max_tokens=8192, temperature=0.7, top_p=0.7, extra_body={'repetition_penalty': 1.05})
 
         kwargs = {
-            "model": model,
+            "model": self.backend.model,
             "messages": messages,
-            "temperature": 0.7,
-            "top_p": 0.7,
             "extra_body": {"enable_thinking": False}
         }
         if max_tokens:
@@ -250,7 +202,7 @@ class LLM:
         logger.info(response.choices[0].message.content)
 
         content = response.choices[0].message.content
-        self.cache.add(query=prompt, response=content, backend=backend)
+        self.cache.add(query=prompt, response=content, backend=self.backend.name)
         
         # except Exception as e:
         #     logger.error( str(e) +' input len {}'.format(len(str(messages))))
@@ -267,8 +219,8 @@ class LLM:
         self.sum_input_token_size += input_token_size
         self.sum_output_token_size += content_token_size
 
-        await instance.tpm.wait(token_count=content_token_size)
-        await instance.rpm.wait()
+        await self.backend.tpm.wait(token_count=content_token_size)
+        await self.backend.rpm.wait()
 
         think_tag = "</think>"
         index = content.find(think_tag)
@@ -298,27 +250,21 @@ class LLM:
                 for char in r:
                     yield char
                 return
-            
-        # choose backend
-        # if user not specify model, use first one
-        if backend == 'default':
-            backend = list(self.backends.keys())[0]
-        instance = self.backends[backend]
 
         # try truncate input prompt
         input_tokens = encode_string(content=prompt)
         input_token_size = len(input_tokens)
-        if input_token_size > instance.max_token_size:
+        if input_token_size > self.backend.max_token_size:
             if not allow_truncate:
                 raise Exception(
-                    f'input token size {input_token_size}, max {instance.max_token_size}'
+                    f'input token size {input_token_size}, max {self.backend.max_token_size}'
                 )
 
-            tokens = input_tokens[0:instance.max_token_size - input_token_size]
+            tokens = input_tokens[0:self.backend.max_token_size - input_token_size]
             prompt = decode_tokens(tokens=tokens)
             input_token_size = len(tokens)
 
-        await instance.tpm.wait(token_count=input_token_size)
+        await self.backend.tpm.wait(token_count=input_token_size)
 
         # build messages
         messages = []
@@ -329,19 +275,15 @@ class LLM:
 
         content = ''
         try:
-            model = self.choose_model(backend=instance,
-                                      token_size=input_token_size)
-            openai_async_client = AsyncOpenAI(base_url=instance.base_url,
-                                              api_key=instance.api_key,
+            openai_async_client = AsyncOpenAI(base_url=self.backend.base_url,
+                                              api_key=self.backend.api_key,
                                               timeout=timeout)
 
             print(messages)
             stream = await openai_async_client.chat.completions.create(
-                model=model,
+                model=self.backend.model,
                 messages=messages,
-                temperature=0.7,
-                top_p=0.7,
-                max_tokens=max_tokens,
+                max_tokens=self.backend.max_token_size - input_token_size,
                 stream=True)
 
             async for chunk in stream:
@@ -356,28 +298,21 @@ class LLM:
             logger.error(str(e) + ' input len {}'.format(len(str(messages))))
             raise e
         content_token_size = len(encode_string(content=content))
-        self.cache.add(query=prompt, response=content, backend=backend)
+        self.cache.add(query=prompt, response=content, backend=self.backend.name)
 
         self.sum_input_token_size += input_token_size
         self.sum_output_token_size += content_token_size
 
-        await instance.tpm.wait(token_count=content_token_size)
-        await instance.rpm.wait()
+        await self.backend.tpm.wait(token_count=content_token_size)
+        await self.backend.rpm.wait()
         return
 
     def chat_sync(self,
                   prompt: str,
-                  backend: str = 'default',
                   system_prompt=None,
                   history=[]):
         loop = always_get_an_event_loop()
         return loop.run_until_complete(
             self.chat(prompt=prompt,
-                      backend=backend,
                       system_prompt=system_prompt,
                       history=history))
-
-    def default_model_info(self):
-        backend = list(self.backends.keys())[0]
-        instance = self.backends[backend]
-        return instance.jsonify()
