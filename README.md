@@ -1,6 +1,13 @@
 # MirrorWe
 
-AI 代替人类管理微信（消息收发、加好友、朋友圈点赞评论）
+把微信彻底交给 AI：
+- 搜索联系人、预测群友性格喜好
+- 私聊群聊消息收发；跨群转发文字、图片、表情包、链接
+- 自动发朋友圈，点赞评论
+
+人类下达中长期任务——如推广本项目—— AI 扮演运营人员执行。
+
+请搜索微信用户 MirrorWe（区分大小写）体验效果。
 
 ## 🚀 快速开始
 
@@ -13,5 +20,6 @@ AI 代替人类管理微信（消息收发、加好友、朋友圈点赞评论�
 
 
 ## 相关项目
-- [HuixiangDou](https://github.com/internlm/huixiangdou) 和 [HuixiangDou2](https://github.com/tpoisonooo/HuixiangDou2)
+- [HuixiangDou](https://github.com/internlm/huixiangdou) 
+- [HuixiangDou2](https://github.com/tpoisonooo/HuixiangDou2)
 - [kimi-cli](https://github.com/MoonshotAI/kimi-cli)

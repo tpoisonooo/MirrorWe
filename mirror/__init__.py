@@ -7,3 +7,14 @@ MirrorWe (HuixiangDou3) - 微信智能助手
 __version__ = "3.0.0"
 __author__ = "tpoisonooo"
 __description__ = "微信智能助手，基于大语言模型"
+
+from .wechat import APIContact, APICircle, APIMessage
+from .core import Person
+from .primitive import always_get_an_event_loop
+
+__all__ = [
+    'APIContact',
+    'APICircle',
+    'APIMessage',
+    'Person',
+]
