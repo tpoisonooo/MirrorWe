@@ -5,7 +5,7 @@
 """
 
 from .db import DB
-from .utils import always_get_an_event_loop
+from .utils import always_get_an_event_loop, get_env_or_raise, get_env_with_default
 from .llm import ChatCache
 from .json_parser import parse_multiline_json_objects_async
 from .token import encode_string, decode_tokens, judge_language
@@ -26,7 +26,9 @@ __all__ = [
     'TPM',
     
     # 工具函数
-    'always_get_an_event_loop'
+    'always_get_an_event_loop',
+    'get_env_or_raise',
+    'get_env_with_default',
 
     # JSON解析器
     'parse_multiline_json_objects_async'

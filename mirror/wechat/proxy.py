@@ -313,15 +313,6 @@ class WkteamManager:
         self.preprocessed = set()
         self.messages = []
 
-        # {group_id: group_name}
-        self.group_whitelist = dict()
-        self._load_group_whitelist()
-
-        # load wkteam license
-        wkteam_dir = get_env_or_raise('WKTEAM_DATA')
-        if not os.path.exists(wkteam_dir):
-            os.makedirs(wkteam_dir)
-
         # messages sent
         # {groupId: [wx_msg]}
         self.sent_msg = dict()
@@ -341,14 +332,14 @@ class WkteamManager:
 
     def revert_all(self):
         # 撤回所有群所有消息
-        for groupId in self.group_whitelist:
+        for groupId in self.cookie.group_whitelist:
             self.revert(groupId=groupId)
 
     def revert(self, groupId: str):
         """Revert all msgs in this group."""
         # 撤回在本群 2 分钟内发出的所有消息
-        if groupId in self.group_whitelist:
-            groupname = self.group_whitelist[groupId]
+        if groupId in self.cookie.group_whitelist:
+            groupname = self.cookie.group_whitelist[groupId]
             logger.debug('revert message in group {} {}'.format(
                 groupname, groupId))
         else:
@@ -429,8 +420,7 @@ class WkteamManager:
         url = ''
         path = ''
         try:
-            wkteam_dir = get_env_or_raise('WKTEAM_DATA')
-            url, path = download(data, headers, wkteam_dir)
+            url, path = download(data, headers, self.cookie.data_dir)
         except Exception as e:
             logger.error(str(e))
             return None, None
@@ -443,8 +433,8 @@ class WkteamManager:
         # auth
         headers = {'Content-Type': 'application/json'}
         data = {
-            'account': account,
-            'password': password
+            'account': self.cookie.account,
+            'password': self.cookie.password
         }
 
         json_obj, err = self.post(url='http://{}/member/login'.format(
@@ -482,7 +472,7 @@ class WkteamManager:
         self.cookie.wcId = x['wcId']
 
         # dump
-        with open(self.license_path, 'w') as f:
+        with open(self.cookie.license_path, 'w') as f:
             json_str = json.dumps(
                 {
                     'auth': self.cookie.auth,
@@ -496,8 +486,8 @@ class WkteamManager:
 
     def set_callback(self):
         # set callback url
-        callback_ip = get_env_or_raise('WKTEAM_CALLBACK_IP')
-        callback_port = int(get_env_or_raise('WKTEAM_CALLBACK_PORT'))
+        callback_ip = self.cookie.callback_ip
+        callback_port = self.cookie.callback_port
         httpUrl = 'http://{}:{}/callback'.format(callback_ip, callback_port)
         logger.debug('set callback url {}'.format(httpUrl))
         headers = {
@@ -514,7 +504,7 @@ class WkteamManager:
             return err
 
         logger.info('login success, all license come from {}'.format(
-            self.license_path))
+            self.cookie.license_path))
         return None
 
     def send_image(self, groupId: str, image_url: str):
@@ -684,15 +674,7 @@ class WkteamManager:
                     os.makedirs(default_dir)
                 return os.path.join(default_dir, 'message.jsonl')
 
-        async def forward_msg(input_json: dict):
-            msg = Message()
-
-            print(input_json)
-            err = msg.parse(wx_msg=input_json, bot_wxid=self.cookie.wcId, auth=self.cookie.auth, wkteam_ip_port=self.cookie.WKTEAM_IP_PORT)
-            if err is not None:
-                logger.error(str(err))
-                return
-
+        async def forward_msg(msg: Message):
             if msg.new_msg_id in self.preprocessed:
                 print(f'{msg.new_msg_id} repeated, skip')
                 return
@@ -701,7 +683,7 @@ class WkteamManager:
             # 不是白名单群里的消息，不处理
             come_from_whitelist = False
             from_group_name = ''
-            for groupId, groupname in self.group_whitelist.items():
+            for groupId, groupname in self.cookie.group_whitelist.items():
                 if msg.group_id == groupId:
                     come_from_whitelist = True
                     from_group_name = groupname
@@ -713,7 +695,7 @@ class WkteamManager:
                 # self message, skip
                 return
             
-            for groupId, _ in self.group_whitelist.items():
+            for groupId, _ in self.cookie.group_whitelist.items():
                 # 本群已发过的消息，不处理
                 if groupId == msg.group_id:
                     continue
@@ -776,8 +758,14 @@ class WkteamManager:
                     self.revert_all()
                     return web.json_response(text='done')
 
+                msg = Message()
+                err = msg.parse(wx_msg=input_json, bot_wxid=self.cookie.wcId, auth=self.cookie.auth, wkteam_ip_port=self.cookie.WKTEAM_IP_PORT)
+                if err is not None:
+                    logger.error(str(err))
+                    return web.json_response(text='done')
+
                 if forward and not is_revert_command(input_json):
-                    await forward_msg(input_json)
+                    await forward_msg(msg)
 
             except Exception as e:
                 logger.error(str(e))
@@ -789,12 +777,16 @@ class WkteamManager:
         web.run_app(app, host='0.0.0.0', port=port)
 
     def serve(self, forward:bool=False):
-        wkteam_dir = get_env_or_raise('WKTEAM_DATA')
-        callback_port = int(get_env_or_raise('WKTEAM_CALLBACK_PORT'))
-        p = Process(target=self.bind, args=(wkteam_dir, callback_port, forward))
-        p.start()
-        self.set_callback()
-        p.join()
+        wkteam_dir = self.cookie.data_dir
+        callback_port = self.cookie.callback_port
+
+        if True:
+            self.bind(wkteam_dir, callback_port, forward)
+        else:
+            p = Process(target=self.bind, args=(wkteam_dir, callback_port, forward))
+            p.start()
+            self.set_callback()
+            p.join()
 
     def fetch_groupchats(self, user: User, max_length: int = 12):
         """Before obtaining user messages, there are a maximum of `max_length`

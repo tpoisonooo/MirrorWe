@@ -1,4 +1,8 @@
 from dotenv import load_dotenv
+from ..primitive import get_env_or_raise, get_env_with_default
+import os
+import json
+from loguru import logger
 
 load_dotenv()
 class Cookie:
@@ -24,8 +28,11 @@ class Cookie:
         self.account = get_env_or_raise('WKTEAM_ACCOUNT')
         self.password = get_env_or_raise('WKTEAM_PASSWORD')
         self.callback_ip = get_env_or_raise('WKTEAM_CALLBACK_IP')
+        self.callback_port = int(get_env_or_raise('WKTEAM_CALLBACK_PORT'))
         self.proxy = int(get_env_or_raise('WKTEAM_PROXY'))
-        
+        self.data_dir = get_env_or_raise('WKTEAM_DATA')
+        os.makedirs(self.data_dir, exist_ok=True)
+
         if len(self.account) < 1 or len(self.password) < 1:
             return Exception('wkteam account or password not set')
 
