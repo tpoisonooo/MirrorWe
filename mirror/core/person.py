@@ -36,6 +36,7 @@ class Person(ABC):
         current_file = inspect.getfile(self.__class__)
         data_dir = os.path.join(os.path.dirname(current_file), "..", "..", "data")
         self.wxid_dir = os.path.join(data_dir, 'friends', self.wxid)
+        self.llm = LLM() 
 
     async def initialize(self):
         # 尝试加载本地消息数据
@@ -51,10 +52,11 @@ class Person(ABC):
                 logger.info(f"Person {self.wxid}: 没有找到本地消息数据，使用默认个性")
         
         # TODO 并行化
-        await analysis()
         await self.brief_bio()
+        await analysis()
 
     async def brief_bio(self) -> str:
+        """生成或加载朋友的 bio.md 文件"""
         bio_path = os.path.join(self.wxid_dir, "bio.md")
         bio = ""
         if os.path.exists(bio_path):
@@ -64,9 +66,12 @@ class Person(ABC):
                     bio = bio.strip()
             except Exception as e:
                 logger.error(f"读取 bio.md 失败: {e}")
-                
+
+        if not bio and not self.memory.private and len(self.memory.group) < 64:
+            logger.warning(f"没有足够的信息生成 bio.md 文件")
+            return "" # 无法生成画像
+        
         prompt = FRIEND_BIO.format(
-            tag=self.TAG_YOU,
             bio=bio,
             private=json.dumps(self.memory.private, ensure_ascii=False, indent=2), 
             group=json.dumps(self.memory.group, ensure_ascii=False, indent=2))

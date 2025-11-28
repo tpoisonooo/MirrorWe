@@ -13,6 +13,7 @@ from mirror import always_get_an_event_loop
 import inspect
 import os
 from typing import List, Any, Dict
+from tqdm.asyncio import tqdm
 
 async def init_bio(api_contact, targets: List[str], _type: str) -> None:
     """Initialize bio information for contacts or groups."""
@@ -99,14 +100,10 @@ async def main():
         
         logger.info(f"Initializing profiles for {len(person_list)} people...")
         
-        for wx_id in person_list:
-            try:
-                logger.debug(f"Initializing profile for {wx_id}")
-                p = Person(wxid=wx_id)
-                await p.initialize()
-            except Exception as e:
-                logger.error(f"Failed to initialize profile for {wx_id}: {e}")
-                continue
+        for wx_id in tqdm(person_list):
+            logger.debug(f"Initializing profile for {wx_id}")
+            p = Person(wxid=wx_id)
+            await p.initialize()
                 
         logger.info("Profile initialization completed")
         
