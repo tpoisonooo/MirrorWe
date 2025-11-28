@@ -4,6 +4,8 @@ import json
 from loguru import logger
 from .cookie import Cookie
 from .helper import async_post
+import asyncio
+import random
 
 class APIContact:
     def __init__(self):

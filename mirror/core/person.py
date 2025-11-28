@@ -13,6 +13,7 @@ from typing import List, Dict, Any
 from loguru import logger
 from ..primitive import json_parser
 from ..prompt import FRIEND_BIO
+from ..primitive import parse_multiline_json_objects_async
 
 from datetime import datetime
 
@@ -38,6 +39,7 @@ class Person(ABC):
 
     async def initialize(self):
         # 尝试加载本地消息数据
+        import pdb; pdb.set_trace()
         await self._load_local_messages()
         
         async def analysis():
@@ -69,21 +71,25 @@ class Person(ABC):
             bio=bio,
             private=json.dumps(self.memory.private, ensure_ascii=False, indent=2), 
             group=json.dumps(self.memory.group, ensure_ascii=False, indent=2))
+        # 使用新的LLM适配器
         self.bio = await llm.chat(prompt)
         with open(bio_path, "w", encoding="utf-8") as f:
-            f.write(bio)
+            f.write(self.bio)
 
     async def _load_local_messages(self):
         """加载 message.jsonl 文件"""
         try:
             # 查找 messages.jsonl 文件
             message_files = [os.path.join(self.wxid_dir, "message.jsonl"), os.path.join(self.wxid_dir, "group_segment.jsonl")]
-
+            
+            total_loaded = 0
             # 解析多行JSON格式
             for messages_file in message_files:
                 if not os.path.exists(messages_file):
                     continue
-                async for obj in parse_jsonl_file_async(messages_file):
+                
+                file_loaded = 0
+                async for obj in parse_multiline_json_objects_async(messages_file):
                     data = obj.get('data', {})
                     is_self = data.get('self', False)
                     content = data.get('content', '').strip()
@@ -97,11 +103,16 @@ class Person(ABC):
                         else:
                             message = {"role":self.TAG_YOU,"content":content,"ts":ts}
                         self.memory.add(private_chat=message)
+                        file_loaded += 1
                     elif obj.get('messageType') == '80001':
                         message = {"role":self.TAG_YOU,"content":content,"ts":ts}
                         self.memory.add(group_chat=message)
-
-            logger.info(f"从 {messages_file} 加载了 {len(self.memory)} 条有效私聊消息")
+                        file_loaded += 1
+                
+                total_loaded += file_loaded
+                logger.info(f"从 {messages_file} 加载了 {file_loaded} 条有效消息")
+            
+            logger.info(f"总共加载了 {total_loaded} 条有效消息")
             
         except Exception as e:
             logger.error(f"加载本地消息数据失败: {e}")
@@ -110,7 +121,8 @@ class Person(ABC):
     
     async def _analyze_personality(self):
         """基于消息数据进行个性分析"""
-        if not self.messages_data:
+        # 从 memory 中获取消息数据
+        if not self.memory:
             self.analysis_result = self._get_default_analysis()
             return
         
@@ -119,7 +131,10 @@ class Person(ABC):
             contents = []
             timestamps = []
             
-            for msg in self.messages_data:
+            for msg in self.memory:
+                if not isinstance(msg, dict):
+                    continue
+                    
                 role = msg.get('role', '')
                 if role == self.TAG_ME:
                     continue  # 跳过自己的消息
@@ -127,7 +142,9 @@ class Person(ABC):
                 content = msg.get('content', '').strip()
                 if content:
                     contents.append(content)
-                timestamps.append(msg.get('timestamp', 0))
+                    ts = msg.get('timestamp', 0)
+                    if ts:
+                        timestamps.append(ts)
             
             if not contents:
                 self.analysis_result = self._get_default_analysis()
