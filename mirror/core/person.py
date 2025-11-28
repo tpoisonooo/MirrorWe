@@ -14,7 +14,7 @@ from loguru import logger
 from ..primitive import json_parser
 from ..prompt import FRIEND_BIO
 from ..primitive import parse_multiline_json_objects_async
-
+from ..primitive import LLM
 from datetime import datetime
 
 # 添加项目路径
@@ -39,7 +39,6 @@ class Person(ABC):
 
     async def initialize(self):
         # 尝试加载本地消息数据
-        import pdb; pdb.set_trace()
         await self._load_local_messages()
         
         async def analysis():
@@ -47,7 +46,6 @@ class Person(ABC):
             if self.memory:
                 await self._analyze_personality()
                 await self._setup_personality_from_analysis()
-                await self._seed_memories_from_data()
                 logger.info(f"Person {self.wxid}: 加载了 {len(self.memory)} 条消息，完成个性分析")
             else:
                 logger.info(f"Person {self.wxid}: 没有找到本地消息数据，使用默认个性")
@@ -68,16 +66,17 @@ class Person(ABC):
                 logger.error(f"读取 bio.md 失败: {e}")
                 
         prompt = FRIEND_BIO.format(
+            tag=self.TAG_YOU,
             bio=bio,
             private=json.dumps(self.memory.private, ensure_ascii=False, indent=2), 
             group=json.dumps(self.memory.group, ensure_ascii=False, indent=2))
         # 使用新的LLM适配器
-        self.bio = await llm.chat(prompt)
+        self.bio = await self.llm.chat(prompt)
         with open(bio_path, "w", encoding="utf-8") as f:
             f.write(self.bio)
 
     async def _load_local_messages(self):
-        """加载 message.jsonl 文件"""
+        """加载 message.jsonl 和 group_segment.jsonl 文件"""
         try:
             # 查找 messages.jsonl 文件
             message_files = [os.path.join(self.wxid_dir, "message.jsonl"), os.path.join(self.wxid_dir, "group_segment.jsonl")]
@@ -158,13 +157,13 @@ class Person(ABC):
             time_pattern = await self._analyze_time_pattern(timestamps)
             
             # 语言特征分析
-            language_features = self._analyze_language_features(contents)
+            language_features = await self._analyze_language_features(contents)
             
             # 情感分析
-            emotion_pattern = self._analyze_emotion_pattern(contents)
+            emotion_pattern = await self._analyze_emotion_pattern(contents)
             
             # 关键词提取
-            keywords = self._extract_keywords(contents)
+            keywords = await self._extract_keywords(contents)
             
             self.analysis_result = {
                 'total_messages': total_messages,
