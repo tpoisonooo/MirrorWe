@@ -55,23 +55,40 @@ class Person(ABC):
         await self.brief_bio()
         await analysis()
 
-    async def brief_bio(self) -> str:
-        """生成或加载朋友的 bio.md 文件"""
-        bio_path = os.path.join(self.wxid_dir, "bio.md")
-        bio = ""
-        if os.path.exists(bio_path):
+    async def try_load_text(self, path) -> str:
+        text = ''
+        if os.path.exists(path):
             try:
-                async with aiofiles.open(bio_path, mode='r', encoding='utf-8') as f:
-                    bio = await f.read()
-                    bio = bio.strip()
+                async with aiofiles.open(path, mode='r', encoding='utf-8') as f:
+                    text = await f.read()
+                    text = text.strip()
             except Exception as e:
-                logger.error(f"读取 bio.md 失败: {e}")
+                logger.error(f"读取 {path} 失败: {e}")
+        return text
+
+    async def brief_bio(self) -> str:
+        """生成朋友的  bio.md 文件"""
+
+        basic = try_load_text(os.path.join(self.wxid_dir, "basic.json"))
+        bio = try_load_text(os.path.join(self.wxid_dir, "bio.md"))
 
         if not bio and not self.memory.private and len(self.memory.group) < 64:
             logger.warning(f"没有足够的信息生成 bio.md 文件")
             return "" # 无法生成画像
         
+        # 按 LLM 最大长度，截断百分之多少上下文
+        max_text_size = self.llm.backend.max_token_size * 2 * 0.8
+        cur_text_size = len(basic) + len(bio) + len(str(self.memory.private)) + len(str(self.memory.group))
+        cut_ratio = max_text_size / cur_text_size
+        if cut_ratio > 1.0:
+            cut_private_index = 0
+            cut_group_index = 0
+        else:
+            cut_private_index = max(0, int(cut_ratio * len(self.memory.private)))
+            cut_group_index = max(0, int(cut_ratio * len(self.memory.group)))
+
         prompt = FRIEND_BIO.format(
+            basic=basic,
             bio=bio,
             private=json.dumps(self.memory.private, ensure_ascii=False, indent=2), 
             group=json.dumps(self.memory.group, ensure_ascii=False, indent=2))

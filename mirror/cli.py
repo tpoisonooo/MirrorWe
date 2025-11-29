@@ -15,7 +15,7 @@ import os
 from typing import List, Any, Dict
 from tqdm.asyncio import tqdm
 
-async def init_bio(api_contact, targets: List[str], _type: str) -> None:
+async def init_basic(api_contact, targets: List[str], _type: str) -> None:
     """Initialize bio information for contacts or groups."""
     MAX_BATCH = 20
     current_file = inspect.getfile(inspect.currentframe())
@@ -39,17 +39,10 @@ async def init_bio(api_contact, targets: List[str], _type: str) -> None:
                 wxid_dir = os.path.join(data_dir, "friends", wxid)
                 os.makedirs(wxid_dir, exist_ok=True)
 
-                bio_path = os.path.join(wxid_dir, 'bio.md')
-                with open(bio_path, 'a', encoding='utf-8') as f:
-                    f.write(f"##  {_type} {contact.get('nickName', 'Unknown')} 的信息\n\n")
-                    f.write(f"- 微信号: {contact.get('aliasName', 'N/A')}\n")
-                    f.write(f"- 昵称: {contact.get('nickName', 'N/A')}\n")
-                    f.write(f"- 备注: {contact.get('remark', 'N/A')}\n")
-                    f.write(f"- 性别: {contact.get('sex', 'Unknown')}\n")
-                    f.write(f"- 头像图片: {contact.get('bigHead', '')}\n")
-                    f.write(f"- 头像缩略图: {contact.get('smallHead', '')}\n")
-                    f.write(f"- 国家: {contact.get('country', 'Unknown')}\n")
-                    f.write(f"- 签名: {contact.get('signature', '')}\n\n")
+                basic_path = os.path.join(wxid_dir, 'basic.json')
+                with open(basic_path, 'a', encoding='utf-8') as f:
+                    basic_str = json.dumps(contact, indent=2, ensure_ascii=False)
+                    f.write(basic_str)
         except Exception as e:
             logger.error(f"处理联系人批次失败: {e}")
             continue
@@ -76,12 +69,12 @@ async def main():
         # Process friends
         if friends:
             logger.info("Processing friends...")
-            await init_bio(api_contact, friends, 'friend')
+            await init_basic(api_contact, friends, 'friend')
         
         # Process groups
         if groups:
             logger.info("Processing groups...")
-            await init_bio(api_contact, groups, 'group')
+            await init_basic(api_contact, groups, 'group')
 
         ## 对每个群友+好友，进行画像初始化
         current_file = inspect.getfile(inspect.currentframe())
