@@ -36,11 +36,20 @@ class Person(ABC):
         current_file = inspect.getfile(self.__class__)
         data_dir = os.path.join(os.path.dirname(current_file), "..", "..", "data")
         self.wxid_dir = os.path.join(data_dir, 'friends', self.wxid)
+        self.basic_path = os.path.join(self.wxid_dir, "basic.json")
+        self.private_path = os.path.join(self.wxid_dir, "message.jsonl")
+        self.group_path = os.path.join(self.wxid_dir, "group_segment.jsonl")
         self.llm = LLM() 
 
     async def initialize(self):
         # 尝试加载本地消息数据
-        await self._load_local_messages()
+        group_file_size = os.path.getsize(self.group_path) if os.path.exists(self.group_path) else 0
+
+        # 群里不说话、也不是微信直接好友的（没有 basic），跳过
+        if group_file_size < 16*1024 and not os.path.exists(self.basic_path):
+            return
+
+        await self._load_local_messages([self.private_path, self.group_path])
         
         async def analysis():
             # 经典统计
@@ -51,7 +60,6 @@ class Person(ABC):
             else:
                 logger.info(f"Person {self.wxid}: 没有找到本地消息数据，使用默认个性")
         
-        # TODO 并行化
         await self.brief_bio()
         await analysis()
 
@@ -68,16 +76,15 @@ class Person(ABC):
 
     async def brief_bio(self) -> str:
         """生成朋友的  bio.md 文件"""
+        basic = await self.try_load_text(self.basic_path)
+        bio_path = os.path.join(self.wxid_dir, "bio.md")
+        bio = await self.try_load_text(bio_path)
 
-        basic = try_load_text(os.path.join(self.wxid_dir, "basic.json"))
-        bio = try_load_text(os.path.join(self.wxid_dir, "bio.md"))
-
-        if not bio and not self.memory.private and len(self.memory.group) < 64:
-            logger.warning(f"没有足够的信息生成 bio.md 文件")
+        if not basic and not self.memory.private and len(self.memory.group) < 256:
             return "" # 无法生成画像
         
         # 按 LLM 最大长度，截断百分之多少上下文
-        max_text_size = self.llm.backend.max_token_size * 2 * 0.8
+        max_text_size = self.llm.backend.max_token_size * 2 * 0.7
         cur_text_size = len(basic) + len(bio) + len(str(self.memory.private)) + len(str(self.memory.group))
         cut_ratio = max_text_size / cur_text_size
         if cut_ratio > 1.0:
@@ -87,22 +94,26 @@ class Person(ABC):
             cut_private_index = max(0, int(cut_ratio * len(self.memory.private)))
             cut_group_index = max(0, int(cut_ratio * len(self.memory.group)))
 
+        private = self.memory.private[-cut_private_index:]
+        group = self.memory.group[-cut_group_index:]
+
         prompt = FRIEND_BIO.format(
             basic=basic,
             bio=bio,
-            private=json.dumps(self.memory.private, ensure_ascii=False, indent=2), 
-            group=json.dumps(self.memory.group, ensure_ascii=False, indent=2))
+            private=json.dumps(private, ensure_ascii=False, indent=2), 
+            group=json.dumps(group, ensure_ascii=False, indent=2))
         # 使用新的LLM适配器
-        self.bio = await self.llm.chat(prompt)
+        try:
+            self.bio = await self.llm.chat(prompt)
+        except Exception as e:
+            self.bio = str(e)
+
         with open(bio_path, "w", encoding="utf-8") as f:
             f.write(self.bio)
 
-    async def _load_local_messages(self):
+    async def _load_local_messages(self, message_files: List[str]):
         """加载 message.jsonl 和 group_segment.jsonl 文件"""
         try:
-            # 查找 messages.jsonl 文件
-            message_files = [os.path.join(self.wxid_dir, "message.jsonl"), os.path.join(self.wxid_dir, "group_segment.jsonl")]
-            
             total_loaded = 0
             # 解析多行JSON格式
             for messages_file in message_files:
@@ -163,7 +174,7 @@ class Person(ABC):
                 content = msg.get('content', '').strip()
                 if content:
                     contents.append(content)
-                    ts = msg.get('timestamp', 0)
+                    ts = msg.get('ts', 0)
                     if ts:
                         timestamps.append(ts)
             

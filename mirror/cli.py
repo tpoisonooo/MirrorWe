@@ -11,6 +11,7 @@ from mirror import APIContact, APICircle, APIMessage
 from mirror import Person
 from mirror import always_get_an_event_loop
 import inspect
+import json
 import os
 from typing import List, Any, Dict
 from tqdm.asyncio import tqdm
@@ -40,7 +41,7 @@ async def init_basic(api_contact, targets: List[str], _type: str) -> None:
                 os.makedirs(wxid_dir, exist_ok=True)
 
                 basic_path = os.path.join(wxid_dir, 'basic.json')
-                with open(basic_path, 'a', encoding='utf-8') as f:
+                with open(basic_path, 'w', encoding='utf-8') as f:
                     basic_str = json.dumps(contact, indent=2, ensure_ascii=False)
                     f.write(basic_str)
         except Exception as e:
