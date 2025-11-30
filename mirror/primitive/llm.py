@@ -20,6 +20,7 @@ from functools import wraps
 import sqlite3
 import uuid
 import hashlib
+from datetime import datetime
 
 from .db import DB
 from .utils import get_env_or_raise, get_env_with_default
@@ -178,6 +179,10 @@ class LLM:
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
+        else:
+            time_str = datetime.now().strftime("当前时间：%Y年%m月%d日 %H时%M分%S秒")
+            messages.append({"role": "system", "content": time_str})
+        
         messages.extend(history)
         messages.append({"role": "user", "content": prompt})
 

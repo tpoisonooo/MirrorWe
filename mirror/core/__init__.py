@@ -1,2 +1,2 @@
 from .person import Person
-__all__ = ['Person']
+__all__ = ['Person', 'Group']

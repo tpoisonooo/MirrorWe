@@ -18,8 +18,8 @@
 - wechat/proxy.py 代理。做 wechat 登录、跨群消息转发、接收消息分类
 - wechat/reorganize.py 处理历史保存的消息。过去的消息也没分类，只存到了单个 .jsonl
 
-
-## 相关项目
-- [HuixiangDou](https://github.com/internlm/huixiangdou) 
-- [HuixiangDou2](https://github.com/tpoisonooo/HuixiangDou2)
-- [kimi-cli](https://github.com/MoonshotAI/kimi-cli)
+## 致谢
+- [ncnn contributors](https://github.com/tencent/ncnn) 提供验证环境
+- [HuixiangDou](https://github.com/internlm/huixiangdou) 微信接入方法
+- [HuixiangDou2](https://github.com/tpoisonooo/HuixiangDou2) Retrieval 相关研究
+- [kimi-cli](https://github.com/MoonshotAI/kimi-cli) 工具调用实现

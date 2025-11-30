@@ -49,7 +49,7 @@ class Person(ABC):
         if group_file_size < 16*1024 and not os.path.exists(self.basic_path):
             return
 
-        await self._load_local_messages([self.private_path, self.group_path])
+        name = await self._load_local_messages([self.private_path, self.group_path])
         
         async def analysis():
             # 经典统计
@@ -60,7 +60,7 @@ class Person(ABC):
             else:
                 logger.info(f"Person {self.wxid}: 没有找到本地消息数据，使用默认个性")
         
-        await self.brief_bio()
+        await self.brief_bio(name=name)
         await analysis()
 
     async def try_load_text(self, path) -> str:
@@ -74,13 +74,13 @@ class Person(ABC):
                 logger.error(f"读取 {path} 失败: {e}")
         return text
 
-    async def brief_bio(self) -> str:
+    async def brief_bio(self, name:str) -> str:
         """生成朋友的  bio.md 文件"""
         basic = await self.try_load_text(self.basic_path)
         bio_path = os.path.join(self.wxid_dir, "bio.md")
         bio = await self.try_load_text(bio_path)
 
-        if not basic and not self.memory.private and len(self.memory.group) < 256:
+        if not basic and not self.memory.private and len(self.memory.group) < 64:
             return "" # 无法生成画像
         
         # 按 LLM 最大长度，截断百分之多少上下文
@@ -98,6 +98,7 @@ class Person(ABC):
         group = self.memory.group[-cut_group_index:]
 
         prompt = FRIEND_BIO.format(
+            name=name,
             basic=basic,
             bio=bio,
             private=json.dumps(private, ensure_ascii=False, indent=2), 
@@ -113,6 +114,8 @@ class Person(ABC):
 
     async def _load_local_messages(self, message_files: List[str]):
         """加载 message.jsonl 和 group_segment.jsonl 文件"""
+
+        name = '某位好友'
         try:
             total_loaded = 0
             # 解析多行JSON格式
@@ -125,19 +128,20 @@ class Person(ABC):
                     data = obj.get('data', {})
                     is_self = data.get('self', False)
                     content = data.get('content', '').strip()
+                    name = data.get('pushContent', ':').split(':')[0].strip()
                     ts = data.get('timestamp', 0)
 
                     if obj.get('messageType') == '60001':
                         # dt = datetime.fromtimestamp(ts)
                         # formatted = dt.strftime('%Y%m%d %H%M%S')
                         if is_self:
-                            message = {"role":self.TAG_ME,"content":content,"ts":ts}
+                            message = {"content":f"{self.TAG_ME}:{content}", "ts":ts}
                         else:
-                            message = {"role":self.TAG_YOU,"content":content,"ts":ts}
+                            message = {"content":f"{name}:{content}", "ts":ts}
                         self.memory.add(private_chat=message)
                         file_loaded += 1
                     elif obj.get('messageType') == '80001':
-                        message = {"role":self.TAG_YOU,"content":content,"ts":ts}
+                        message = {"content":f"{name}:{content}", "ts":ts}
                         self.memory.add(group_chat=message)
                         file_loaded += 1
                 
@@ -150,6 +154,7 @@ class Person(ABC):
             logger.error(f"加载本地消息数据失败: {e}")
             import traceback
             traceback.print_exc()
+        return name
     
     async def _analyze_personality(self):
         """基于消息数据进行个性分析"""
