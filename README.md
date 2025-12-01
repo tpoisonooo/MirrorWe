@@ -26,3 +26,8 @@
 - [kimi-cli](https://github.com/MoonshotAI/kimi-cli) 工具调用实现
 - [HuixiangDou2](https://github.com/tpoisonooo/HuixiangDou2) Retrieval 研究
 - [HuixiangDou](https://github.com/internlm/huixiangdou) 微信接入方法
+
+## 开发随感
+- 20251130 观察到微信群复读导致 modeling 群友出现偏差。例如某人消息里太多“白座”，会认为这个群友是白座。
+- 20251129 想方便可视化 jsonl@indent=2，又期望高性能用 pyarrow，难兼顾。
+- 20251123 用 coding 的方式动态 modeling 群友。实现后又不知道有啥实际作用。只能先放进 experimental
