@@ -8,11 +8,14 @@ import sys
 import pdb
 from loguru import logger
 from mirror import APIContact, APICircle, APIMessage
-from mirror import Person
+from mirror import Person, Group
+from mirror.primitive import LLM
+from mirror.prompt import SUMMARY_BIO
 from mirror import always_get_an_event_loop
 import inspect
 import json
 import os
+import aiofiles
 from typing import List, Any, Dict
 from tqdm.asyncio import tqdm
 
@@ -48,18 +51,9 @@ async def init_basic(api_contact, targets: List[str], _type: str) -> None:
             logger.error(f"处理联系人批次失败: {e}")
             continue
 
-async def main():
-    parser = argparse.ArgumentParser(description="MirrorWe CLI 工具")
-    parser.add_argument('--version', action='version', version='MirrorWe 3.0.0')
-    parser.add_argument('--debug', action='store_true', help='Enable debug mode')
-    args = parser.parse_args()
-    
-    if args.debug:
-        pass
-
-    api_contact = APIContact()
-
+async def init_friends():
     try:
+        api_contact = APIContact()
         ## 初始化群和好友的 bio.md 文件
         contacts = await api_contact.get_address_book()
         friends = contacts.get('friends', [])
@@ -105,8 +99,46 @@ async def main():
         logger.error(f"Main execution failed: {e}")
         import traceback
         traceback.print_exc()
-        return 1
+
+async def init_groups():
+    ## 对每个群友+好友，进行画像初始化
+    current_file = inspect.getfile(inspect.currentframe())
+    group_dir = os.path.join(os.path.dirname(current_file), "..", "data", "groups")
+    group_list = os.listdir(group_dir)
+    for wx_id in tqdm(group_list):
+        logger.debug(f"Initializing profile for {wx_id}")
+        g = Group(wxid=wx_id)
+        await g.initialize()
+
+async def init_summary():
+    current_file = inspect.getfile(inspect.currentframe())
+    group_dir = os.path.join(os.path.dirname(current_file), "..", "data", "groups")
+    friend_dir = os.path.join(os.path.dirname(current_file), "..", "data", "friends")
+
+    bio_files = [ os.path.join(group_dir, wxid, 'bio.md') for wxid in os.listdir(group_dir)] + [os.path.join(friend_dir, wxid, 'bio.md') for wxid in os.listdir(friend_dir)]
+    bio_files = filter(lambda x: os.path.exists(x), bio_files)
     
+    llm = LLM()
+    for bio_file in tqdm(bio_files):
+        async with aiofiles.open(bio_file, mode='r', encoding='utf-8') as f:
+            bio = await f.read()
+            bio = bio.strip()
+
+        prompt = SUMMARY_BIO.format(bio=bio)
+        summary = await llm.chat(prompt)
+
+        summary_path = os.path.join(os.path.dirname(bio_file), 'summary.md')
+        with open(summary_path, 'w', encoding='utf-8') as f:
+            f.write(summary)
+
+async def main():
+    parser = argparse.ArgumentParser(description="MirrorWe CLI 工具")
+    parser.add_argument('--version', action='version', version='MirrorWe 3.0.0')
+    parser.add_argument('--debug', action='store_true', help='Enable debug mode')
+    args = parser.parse_args()
+    await init_friends()
+    await init_groups()
+    await init_summary()
     return 0
 
 if __name__ == '__main__':

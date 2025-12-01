@@ -81,6 +81,7 @@ def get_message_log_paths(logdir:str, message_type: str, sender_id: str, group_i
             return os.path.join(other_dir, 'message.jsonl')
             
     except Exception as e:
+        import pdb; pdb.set_trace()
         logger.error(f"获取消息日志路径失败: {str(e)}")
         # 如果出错，返回一个默认路径
         default_dir = os.path.join(logdir, 'default')
@@ -99,6 +100,7 @@ def save_message_to_file(file_paths: Union[List[str],str], message: dict):
             with open(file_path, 'a', encoding='utf-8') as f:
                 f.write(json_str + '\n')
     except Exception as e:
+        import pdb; pdb.set_trace()
         logger.error(f"保存消息到文件失败 {file_path}: {str(e)}")
 
 class Message:
@@ -652,6 +654,7 @@ class WkteamManager:
                     save_message_to_file(specific_logpaths, input_json)
                     
             except Exception as e:
+                import pdb; pdb.set_trace()
                 logger.error(f"分类保存消息失败: {str(e)}")
 
             logger.debug(input_json)
@@ -674,6 +677,7 @@ class WkteamManager:
                     await forward_msg(msg)
 
             except Exception as e:
+                import pdb; pdb.set_trace()
                 logger.error(str(e))
 
             return web.json_response(text='done')

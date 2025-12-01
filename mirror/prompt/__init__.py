@@ -4,3 +4,6 @@ from pathlib import Path
 
 FRIEND_BIO = (Path(__file__).parent / "friend_bio.md").read_text(encoding="utf-8")
 GROUP_BIO = (Path(__file__).parent / "group_bio.md").read_text(encoding="utf-8")
+SUMMARY_BIO = (Path(__file__).parent / "summary_bio.md").read_text(encoding="utf-8")
+
+ME = (Path(__file__).parent / "me.md").read_text(encoding="utf-8")

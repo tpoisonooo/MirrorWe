@@ -19,7 +19,6 @@ from datetime import datetime
 
 # 添加项目路径
 from mirror.core.memory import MemoryStream
-from mirror.core.personality import Personality
 
 # TODO
 class Group(ABC):
@@ -28,23 +27,20 @@ class Group(ABC):
     def __init__(self, wxid: str):
         self.wxid = wxid
         self.memory = MemoryStream()
-        self.personality = Personality()
-        self.analysis_result = {}  # 存储分析结果
         self.bio = ""
-        
-        self.TAG_ME = "我"
+
         current_file = inspect.getfile(self.__class__)
         data_dir = os.path.join(os.path.dirname(current_file), "..", "..", "data")
         self.wxid_dir = os.path.join(data_dir, 'groups', self.wxid)
         self.basic_path = os.path.join(self.wxid_dir, "basic.json")
         self.group_path = os.path.join(self.wxid_dir, "message.jsonl")
-        self.llm = LLM() 
+        self.llm = LLM()
 
     async def initialize(self):
         # 尝试加载本地消息数据
         group_file_size = os.path.getsize(self.group_path) if os.path.exists(self.group_path) else 0
 
-        # 群没啥消息的，跳过
+        # 没啥消息的空群，跳过
         if group_file_size < 32*1024 and not os.path.exists(self.basic_path):
             return
 
@@ -80,9 +76,7 @@ class Group(ABC):
         else:
             cut_group_index = max(0, int(cut_ratio * len(self.memory.group)))
 
-        private = self.memory.private[-cut_private_index:]
         group = self.memory.group[-cut_group_index:]
-
         prompt = GROUP_BIO.format(
             basic=basic,
             bio=bio,
@@ -113,16 +107,7 @@ class Group(ABC):
                     name = data.get('pushContent', ':').split(':')[0].strip()
                     ts = data.get('timestamp', 0)
 
-                    if obj.get('messageType') == '60001':
-                        # dt = datetime.fromtimestamp(ts)
-                        # formatted = dt.strftime('%Y%m%d %H%M%S')
-                        if is_self:
-                            message = {"content":f"{self.TAG_ME}:{content}", "ts":ts}
-                        else:
-                            message = {"content":f"{name}:{content}", "ts":ts}
-                        self.memory.add(private_chat=message)
-                        file_loaded += 1
-                    elif obj.get('messageType') == '80001':
+                    if obj.get('messageType') == '80001':
                         message = {"content":f"{name}:{content}", "ts":ts}
                         self.memory.add(group_chat=message)
                         file_loaded += 1
