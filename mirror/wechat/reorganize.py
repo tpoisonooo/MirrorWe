@@ -66,7 +66,7 @@ def reorganize_logs_sync(input_jsonl_path: str, output_dir: str):
                     group_id = data.get('fromGroup', '')
                     
                     # 获取对应的消息日志文件路径
-                    specific_logpaths = get_message_log_paths(output_dir, message_type, sender_id, group_id)
+                    specific_logpaths = get_message_log_paths(logdir=output_dir, message_type=message_type, sender_id=sender_id, group_id=group_id)
                     
                     # 保存到对应的分类日志文件
                     save_message_to_file(specific_logpaths, message)
