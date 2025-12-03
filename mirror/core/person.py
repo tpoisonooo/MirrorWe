@@ -105,7 +105,7 @@ class Person(ABC):
             group=json.dumps(group, ensure_ascii=False, indent=2))
         # 使用新的LLM适配器
         try:
-            self.bio = await self.llm.chat(prompt)
+            self.bio = await self.llm.chat_text(prompt)
         except Exception as e:
             self.bio = str(e)
 

@@ -9,7 +9,7 @@ import pdb
 from loguru import logger
 from mirror import APIContact, APICircle, APIMessage
 from mirror import Person, Group
-from mirror.primitive import LLM
+from mirror.primitive import LLM, get_env_or_raise
 from mirror.prompt import SUMMARY_BIO
 from mirror import always_get_an_event_loop
 import inspect
@@ -119,17 +119,19 @@ async def init_summary():
     bio_files = filter(lambda x: os.path.exists(x), bio_files)
     
     llm = LLM()
+
     for bio_file in tqdm(bio_files):
         async with aiofiles.open(bio_file, mode='r', encoding='utf-8') as f:
             bio = await f.read()
             bio = bio.strip()
 
         prompt = SUMMARY_BIO.format(bio=bio)
-        summary = await llm.chat(prompt)
-
+        
+        summary = await llm.chat_text(prompt=prompt)
         summary_path = os.path.join(os.path.dirname(bio_file), 'summary.md')
         with open(summary_path, 'w', encoding='utf-8') as f:
             f.write(summary)
+            logger.info(f"Written summary {summary}")
 
 async def main():
     parser = argparse.ArgumentParser(description="MirrorWe CLI 工具")
