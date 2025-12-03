@@ -3,7 +3,7 @@ name = "MirrorWe"
 version = "3.0.0"
 description = "微信智能助手，基于大语言模型"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 authors = [
     {name = "tpoisonooo", email = "tpoisonooo@gmail.com"}
 ]
@@ -39,6 +39,7 @@ dependencies = [
     "lxml>=4.6.0",
     "pytoml>=0.1.0",
     "tenacity>=8.0.0",
+    "kosong>=0.29.0",
 ]
 
 [[tool.uv.index]]
