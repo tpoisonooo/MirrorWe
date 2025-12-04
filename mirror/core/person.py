@@ -108,7 +108,6 @@ class Person(ABC):
             self.bio = await self.llm.chat_text(prompt)
         except Exception as e:
             self.bio = str(e)
-
         with open(bio_path, "w", encoding="utf-8") as f:
             f.write(self.bio)
 
