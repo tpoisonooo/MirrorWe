@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 from ..primitive import get_env_or_raise, get_env_with_default
 from .cookie import Cookie
 from .api_message import APIMessage
+from .api_contact import APIContact
 
 def is_revert_command(wx_msg: dict):
     """Is wx_msg a revert command."""
@@ -466,7 +467,7 @@ class WkteamManager:
             # 1. 首先记录原始消息到 origin.jsonl
             save_message_to_file(origin_logpath, input_json)
 
-            # 2. 根据消息类型分别记录到对应的文件
+            # 根据消息类型分别记录到对应的文件
             try:
                     
                 message_type = str(input_json.get('messageType', ''))
@@ -491,7 +492,16 @@ class WkteamManager:
                 logger.error(f"分类保存消息失败: {str(e)}")
 
             logger.debug(input_json)
-            if input_json['messageType'] == '00000':
+
+            messageType = input_json.get('messageType', '')
+            if '00000' in messageType:
+                return web.json_response(text='done')
+
+            if '30001' in messageType:
+                # 2. 自动同意所有好友添加，不再交给 agent 处理
+                await asyncio.sleep(random.uniform(1, 10))
+                api_contact = APIContact()
+                await api_contact.parse_and_accept(input_json)
                 return web.json_response(text='done')
 
             try:

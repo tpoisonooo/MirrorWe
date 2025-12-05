@@ -65,56 +65,105 @@ class APIContact:
             return {'contacts': []}
         
         return json_obj.get('data', {'contacts': []})
+
+    async def search_and_add(self, phone: str=None, id: str=None) -> str:
+        """
+        通过手机号或微信号搜索并添加好友，等待对方验证通过
+        https://wkteam.cn/api-wen-dang2/hao-you-cao-zuo/serchUser.html
+        https://wkteam.cn/api-wen-dang2/hao-you-cao-zuo/addFriend.html
+        """
+
+        import pdb
+        pdb.set_trace()
+        if not phone and not id:
+            return 'Parameter error, input phone number or wechat id.'
+
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': self.cookie.auth
+        }
+
+        contact = phone if phone else id
+        data = {
+            'wId': self.cookie.wId,
+            'wcId': contact,
+        }
+        
+        json_obj, err = await async_post(
+            url=f'http://{self.cookie.WKTEAM_IP_PORT}/searchUser',
+            data=data,
+            headers=headers
+        )
+        
+        if err is not None:
+            logger.error(f'Failed to search Contact: {err}')
+            return f'Failed to search Contact: {err}'
+        
+        data = json_obj.get('data', {})
+        if not data:
+            return 'Contact not found'
+
+        v1 = data.get('v1', '')
+        v2 = data.get('v2', '')
+        if v1 and not v2:
+            return f'{contact} already a friend, no need to add'
+        if not v1 and not v2:
+            return f'Error, v1 and v2 both empty for {contact}'
+        
+        data = {
+            'wId': self.cookie.wId,
+            'v1': v1,
+            'v2': v2,
+            'type': 15 if phone else 3,
+            'verify': 'Hello, MirrorBot here. Let\'s be friends!'
+        }
+
+        json_obj, err = await async_post(
+            url=f'http://{self.cookie.WKTEAM_IP_PORT}/addUser',
+            data=data,
+            headers=headers
+        )
+        
+        if err is not None:
+            logger.error(f'Failed to add Contact: {err}')
+            return f'Failed to add Contact: {err}'
+        return 'Success, please wait for verification. About 10 minutes later, you can check the friend list again.'
     
-    # async def get_contact_detail(self, wc_id: str) -> Dict[str, Any]:
-    #     """
-    #     Get detailed contact information for a single contact.
+    async def parse_and_accept(self, message: Dict[str, Any]) -> bool:
+        """解析添加好友的消息，并自动同意好友请求"""
+        data = message.get('data', {})
+        if not data:
+            logger.error('Invalid contact request message data')
+            return False
+        v1 = data.get('v1', '')
+        v2 = data.get('v2', '')
+        wId = data.get('wId', '')
+        scene = data.get('scene', -1)
         
-    #     Args:
-    #         wc_id: WeChat ID of the contact
-            
-    #     Returns:
-    #         Detailed contact information
-    #     """
-    #     result = await self.get_contact([wc_id])
-    #     if result and 'contacts' in result and len(result['contacts']) > 0:
-    #         return result['contacts'][0]
-    #     return {}
-    
-    # async def search_contact(self, keyword: str) -> List[Dict[str, Any]]:
-    #     """
-    #     Search contacts by keyword in nickname, remark, or username.
+        if scene == -1 or not v1 or not v2 or not wId:
+            logger.error('Invalid contact request message data properties')
+            return False
+
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': self.cookie.auth
+        }
+        data = {
+            'wId': self.cookie.wId,
+            'v1': v1,
+            'v2': v2,
+            'scene': scene,
+        }
         
-    #     Args:
-    #         keyword: Search keyword
-            
-    #     Returns:
-    #         List of matching contacts
-    #     """
-    #     address_book = await self.get_address_book()
-    #     all_contacts = []
+        json_obj, err = await async_post(
+            url=f'http://{self.cookie.WKTEAM_IP_PORT}/acceptUser',
+            data=data,
+            headers=headers
+        )
         
-    #     # Get all contact IDs
-    #     contact_ids = []
-    #     if 'friends' in address_book:
-    #         contact_ids.extend(address_book['friends'])
-    #     if 'chatrooms' in address_book:
-    #         contact_ids.extend(address_book['chatrooms'])
+        if err is not None:
+            logger.error(f'Failed to accept Contact: {err}')
+            return False
         
-    #     # Get detailed information for all contacts in batches
-    #     batch_size = 20
-    #     for i in range(0, len(contact_ids), batch_size):
-    #         batch = contact_ids[i:i+batch_size]
-    #         contacts = await self.get_contact(batch)
-    #         if contacts and 'contacts' in contacts:
-    #             all_contacts.extend(contacts['contacts'])
-        
-    #     # Filter by keyword
-    #     matching_contacts = []
-    #     for contact in all_contacts:
-    #         if (keyword.lower() in contact.get('nickName', '').lower() or
-    #             keyword.lower() in contact.get('remark', '').lower() or
-    #             keyword.lower() in contact.get('userName', '').lower()):
-    #             matching_contacts.append(contact)
-        
-    #     return matching_contacts
+        return True
+
