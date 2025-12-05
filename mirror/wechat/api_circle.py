@@ -117,7 +117,7 @@ class APICircle:
         
         return True
     
-    async def sns_send(self, sns_id: str, content: str) -> Dict[str, Any]:
+    async def sns_send(self, content: str) -> Dict[str, Any]:
         """
         发朋友圈 https://wkteam.cn/api-wen-dang2/peng-you-quan/snsSend.html
         ！！！必须保持 3 天在线状态之后，才能发朋友圈！！！
@@ -145,5 +145,6 @@ class APICircle:
         if err is not None:
             logger.error(f'Failed to send to circle: {err}')
             return {}
-        
+
+        # {'createTime': 1764937589, 'id': '14805369577610556100', 'userName': 'wxid_39qg5wnae8dl12', 'objectDesc': 'woola !'}
         return json_obj.get('data', {})
