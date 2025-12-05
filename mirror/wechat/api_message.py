@@ -6,13 +6,12 @@ import hashlib
 from loguru import logger
 from .cookie import Cookie
 from .helper import async_post
-
-global sent_msg
-sent_msg = {}
+import time
 
 class APIMessage:
     def __init__(self):
         self.cookie = Cookie()
+        self.sent_msg = {}
 
     async def send_group_image(self, group_id: str, image_url: str):
         headers = {
@@ -28,10 +27,10 @@ class APIMessage:
 
         sent = json_obj['data']
         sent['wId'] = self.cookie.wId
-        if group_id not in sent_msg:
-            sent_msg[group_id] = [sent]
+        if group_id not in self.sent_msg:
+            self.sent_msg[group_id] = [sent]
         else:
-            sent_msg[group_id].append(sent)
+            self.sent_msg[group_id].append(sent)
 
         return None
 
@@ -49,10 +48,10 @@ class APIMessage:
 
         sent = json_obj['data']
         sent['wId'] = self.cookie.wId
-        if group_id not in sent_msg:
-            sent_msg[group_id] = [sent]
+        if group_id not in self.sent_msg:
+            self.sent_msg[group_id] = [sent]
         else:
-            sent_msg[group_id].append(sent)
+            self.sent_msg[group_id].append(sent)
 
         return None
 
@@ -72,10 +71,10 @@ class APIMessage:
 
         sent = json_obj['data']
         sent['wId'] = self.cookie.wId
-        if group_id not in sent_msg:
-            sent_msg[group_id] = [sent]
+        if group_id not in self.sent_msg:
+            self.sent_msg[group_id] = [sent]
         else:
-            sent_msg[group_id].append(sent)
+            self.sent_msg[group_id].append(sent)
 
         return None
 
@@ -95,10 +94,10 @@ class APIMessage:
 
         sent = json_obj['data']
         sent['wId'] = self.cookie.wId
-        if user_id not in sent_msg:
-            sent_msg[user_id] = [sent]
+        if user_id not in self.sent_msg:
+            self.sent_msg[user_id] = [sent]
         else:
-            sent_msg[user_id].append(sent)
+            self.sent_msg[user_id].append(sent)
 
         return None
 
@@ -118,12 +117,41 @@ class APIMessage:
 
         sent = json_obj['data']
         sent['wId'] = self.cookie.wId
-        if group_id not in sent_msg:
-            sent_msg[group_id] = [sent]
+        if group_id not in self.sent_msg:
+            self.sent_msg[group_id] = [sent]
         else:
-            sent_msg[group_id].append(sent)
-
+            self.sent_msg[group_id].append(sent)
         return None
+
+    async def revert_all(self):
+        """撤回所有群+私聊的所有消息"""
+        for key, sent_list in self.sent_msg.items():
+            # 撤回 2 分钟内发出的所有消息
+            if key in self.cookie.group_whitelist:
+                groupname = self.cookie.group_whitelist[key]
+                logger.debug('revert message in group {} {}'.format(
+                    groupname, key))
+
+            # [{'type': 1, 'msgId': 3267563389, 'newMsgId': 7462106856263168649, 'createTime': 1764935999, 'wcId': 'wxid_raxq4pq3emg212', 'wId': 'c93f9844-ae20-4bc0-b15f-45dc36cd17bd'}]
+            sent_list = self.sent_msg[key]
+            for sent in sent_list:
+                time_diff = abs(time.time() - int(sent.get('createTime', 0)))
+                if time_diff <= 120:
+                    # real revert
+                    headers = {
+                        'Content-Type': 'application/json',
+                        'Authorization': self.cookie.auth
+                    }
+
+                    try: 
+                        _, err = await self.async_post(url='http://{}/revokeMsg'.format(self.cookie.WKTEAM_IP_PORT),
+                            data=sent,
+                            headers=headers)
+                    except Exception as e:
+                        # 遇到异常，尽力撤回
+                        logger.warning(str(err))
+                        await asyncio.sleep(1)
+        self.sent_msg = {}
 
     async def download_image(self, param: dict, data_dir: str) -> Tuple[Optional[str], Optional[str]]:
         """Download group chat image."""

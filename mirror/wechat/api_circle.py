@@ -12,9 +12,10 @@ class APICircle:
     def __init__(self):
         self.cookie = Cookie()
 
-    async def get_circle(self, first_page_md5: str = "", max_id: int = 0) -> Dict[str, Any]:
+    async def get_circle(self, wx_id:str) -> Dict[str, Any]:
         """
-        获取朋友圈 https://wkteam.cn/api-wen-dang2/peng-you-quan/getCircle.html
+        获取好友首页朋友圈 https://wkteam.cn/api-wen-dang2/peng-you-quan/getFriendCircle.html
+        目前只实现首页。
         """
         headers = {
             'Content-Type': 'application/json',
@@ -22,12 +23,13 @@ class APICircle:
         }
         data = {
             'wId': self.cookie.wId,
-            'firstPageMd5': first_page_md5,
-            'maxId': max_id
+            'wcId': wx_id,
+            'firstPageMd5': "",
+            'maxId': 0,
         }
         
         json_obj, err = await async_post(
-            url=f'http://{self.cookie.WKTEAM_IP_PORT}/getCircle',
+            url=f'http://{self.cookie.WKTEAM_IP_PORT}/getFriendCircle',
             data=data,
             headers=headers
         )
@@ -88,7 +90,7 @@ class APICircle:
         
         return json_obj.get('data', {})
 
-    async def sns_comment(self, sns_id: str, content: str) -> Dict[str, Any]:
+    async def sns_comment(self, sns_id: str, content: str) -> bool:
         """
         朋友圈评论 https://wkteam.cn/api-wen-dang2/peng-you-quan/snsComment.html
         """
@@ -111,9 +113,9 @@ class APICircle:
         
         if err is not None:
             logger.error(f'Failed to comment on circle: {err}')
-            return {}
+            return False
         
-        return json_obj.get('data', {})
+        return True
     
     async def sns_send(self, sns_id: str, content: str) -> Dict[str, Any]:
         """

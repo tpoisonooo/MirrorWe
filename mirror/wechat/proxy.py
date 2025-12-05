@@ -255,14 +255,8 @@ class WkteamManager:
         """init with environment variables."""
 
         self.cookie = Cookie()
-        self.users = dict()
         self.preprocessed = set()
-        self.messages = []
 
-        # messages sent
-        # {groupId: [wx_msg]}
-        self.sent_msg = dict()
-        
         # API message handler
         self.api_message = APIMessage()
 
@@ -270,7 +264,7 @@ class WkteamManager:
         """Wrap http post and error handling."""
         resp = requests.post(url, data=json.dumps(data), headers=headers)
         json_str = resp.content.decode('utf8')
-        logger.debug(json_str)
+        # logger.debug(json_str)
         if resp.status_code != 200:
             return None, Exception('wkteam auth fail {}'.format(json_str))
         json_obj = json.loads(json_str)
@@ -278,41 +272,6 @@ class WkteamManager:
             return json_obj, Exception(json_str)
 
         return json_obj, None
-
-    def revert_all(self):
-        # 撤回所有群所有消息
-        for groupId in self.cookie.group_whitelist:
-            self.revert(groupId=groupId)
-
-    def revert(self, groupId: str):
-        """Revert all msgs in this group."""
-        # 撤回在本群 2 分钟内发出的所有消息
-        if groupId in self.cookie.group_whitelist:
-            groupname = self.cookie.group_whitelist[groupId]
-            logger.debug('revert message in group {} {}'.format(
-                groupname, groupId))
-        else:
-            logger.debug('revert message in group {} '.format(groupId))
-
-        if groupId not in self.sent_msg:
-            return
-
-        group_sent_list = self.sent_msg[groupId]
-        for sent in group_sent_list:
-            logger.info(sent)
-            time_diff = abs(time.time() - int(sent['createTime']))
-            if time_diff <= 120:
-                # real revert
-                headers = {
-                    'Content-Type': 'application/json',
-                    'Authorization': self.cookie.auth
-                }
-
-                self.post(url='http://{}/revokeMsg'.format(
-                    self.cookie.WKTEAM_IP_PORT),
-                          data=sent,
-                          headers=headers)
-        del self.sent_msg[groupId]
 
     def login(self):
         """user login, need scan qr code on mobile phone."""
@@ -402,8 +361,6 @@ class WkteamManager:
         # 原始消息日志文件路径
         origin_logpath = os.path.join(logdir, 'origin.jsonl')
         
-
-
 
         async def forward_msg(msg: Message):
             if msg.new_msg_id in self.preprocessed:
@@ -507,7 +464,7 @@ class WkteamManager:
             try:
                 json_str = json.dumps(input_json)
                 if is_revert_command(input_json):
-                    self.revert_all()
+                    await self.api_message.revert_all()
                     return web.json_response(text='done')
 
                 msg = Message()
@@ -540,7 +497,6 @@ class WkteamManager:
             p.start()
             self.set_callback()
             p.join()
-
 
 def parse_args():
     """Parse args."""

@@ -20,10 +20,9 @@ class Cookie:
                 self.wId = jsonobj['wId']
                 self.wcId = jsonobj['wcId']
                 self.qrCodeUrl = jsonobj['qrCodeUrl']
-                logger.debug(jsonobj)
 
         self.group_whitelist = self._load_group_whitelist()
-        self.debug()
+        # self.debug()
 
         self.account = get_env_or_raise('WKTEAM_ACCOUNT')
         self.password = get_env_or_raise('WKTEAM_PASSWORD')

@@ -37,3 +37,4 @@ data/groups/
 data/others/
 data/origin.jsonl
 .cache_llm
+license.json
