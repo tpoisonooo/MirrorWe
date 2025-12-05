@@ -23,6 +23,7 @@ from readability import Document
 from dotenv import load_dotenv
 from ..primitive import get_env_or_raise, get_env_with_default
 from .cookie import Cookie
+from .api_message import APIMessage
 
 def is_revert_command(wx_msg: dict):
     """Is wx_msg a revert command."""
@@ -124,6 +125,9 @@ class Message:
         self.length = 0
         self.new_msg_id = ''
         self.self_msg = False
+        # Image properties for async download
+        self.image_content = ''
+        self.image_msg_id = ''
 
     def parse(self, wx_msg: dict, bot_wxid: str, auth:str='', wkteam_ip_port:str=''):
         # str or int
@@ -201,22 +205,9 @@ class Message:
             # image
             # 图片消息
             parse_type = 'image'
-            getMsgData = {'wId': bot_wxid, 'content': data['content'], 'msgId': data['msgId'], 'type': 0}
-            headers = {
-                'Content-Type': 'application/json',
-                'Authorization': auth
-            }
-            resp = requests.post('http://{}/getMsgImg'.format(wkteam_ip_port), data=json.dumps(getMsgData), headers=headers)
-            json_str = resp.content.decode('utf8')
-            if resp.status_code == 200:
-                jsonobj = json.loads(json_str)
-                if jsonobj['code'] != '1000':
-                    logger.error('download {} {}'.format(data, json_str))
-
-                jsondata = jsonobj['data']
-                if not jsondata:
-                    return Exception('download image failed, skip')
-                self.url = jsonobj['data']['url']
+            # Store image data for later download if needed
+            self.image_content = data.get('content', '')
+            self.image_msg_id = data.get('msgId', '')
 
         elif msg_type in ['80001', '60001']:
             # text
@@ -270,6 +261,9 @@ class WkteamManager:
         # messages sent
         # {groupId: [wx_msg]}
         self.sent_msg = dict()
+        
+        # API message handler
+        self.api_message = APIMessage()
 
     def post(self, url, data, headers):
         """Wrap http post and error handling."""
@@ -318,69 +312,6 @@ class WkteamManager:
                           data=sent,
                           headers=headers)
         del self.sent_msg[groupId]
-
-    def download_image(self, param: dict):
-        """Download group chat image."""
-        content = param['content']
-        msgId = param['msgId']
-        wId = param['wId']
-
-        if len(self.cookie.auth) < 1:
-            logger.error('Authentication empty')
-            return
-
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': self.cookie.auth
-        }
-        data = {'wId': wId, 'content': content, 'msgId': msgId, 'type': 0}
-
-        def generate_hash_filename(data: dict):
-            xstr = json.dumps(data)
-            md5 = hashlib.md5()
-            md5.update(xstr.encode('utf8'))
-            return md5.hexdigest()[0:6] + '.jpg'
-
-        def download(data: dict, headers: dict, dir: str):
-            resp = requests.post('http://{}/getMsgImg'.format(
-                self.cookie.WKTEAM_IP_PORT),
-                                 data=json.dumps(data),
-                                 headers=headers)
-            json_str = resp.content.decode('utf8')
-
-            if resp.status_code == 200:
-                jsonobj = json.loads(json_str)
-                if jsonobj['code'] != '1000':
-                    logger.error('download {} {}'.format(data, json_str))
-                    return
-
-                image_url = jsonobj['data']['url']
-                # download to local
-                logger.info('image url {}'.format(image_url))
-                resp = requests.get(image_url, stream=True)
-                image_path = None
-                if resp.status_code == 200:
-                    image_dir = os.path.join(dir, 'images')
-                    if not os.path.exists(image_dir):
-                        os.makedirs(image_dir)
-                    image_path = os.path.join(
-                        image_dir, generate_hash_filename(data=data))
-                    logger.debug('local path {}'.format(image_path))
-                    with open(image_path, 'wb') as image_file:
-                        for chunk in resp.iter_content(1024):
-                            image_file.write(chunk)
-                return image_url, image_path
-
-        url = ''
-        path = ''
-        try:
-            url, path = download(data, headers, self.cookie.data_dir)
-        except Exception as e:
-            logger.error(str(e))
-            return None, None
-        return url, path
-        # download_task = Process(target=download, args=(data, headers, self.wkteam_config.dir))
-        # download_task.start()
 
     def login(self):
         """user login, need scan qr code on mobile phone."""
@@ -503,17 +434,28 @@ class WkteamManager:
                 if msg.type == 'text':
                     username = msg.push_content.split(':')[0].strip()
                     formatted_reply = '{}：{}'.format(username, msg.content)
-                    self.send_message(groupId=groupId, text=formatted_reply)
+                    await self.api_message.send_group_message(group_id=groupId, text=formatted_reply)
+
                 elif msg.type == 'image':
-                    self.send_image(groupId=groupId, image_url=msg.url)
+                    # For forwarding images, we need to download first then upload
+                    if msg.url:
+                        await self.api_message.send_group_image(group_id=groupId, image_url=msg.url)
+                    else:
+                        # Download image first using stored image data
+                        param = {'wId': self.cookie.wId, 'content': msg.image_content, 'msgId': msg.image_msg_id}
+                        image_url, _ = await self.api_message.download_image(param, self.cookie.data_dir)
+
+                        if image_url:
+                            await self.api_message.send_group_image(group_id=groupId, image_url=image_url)
                 elif msg.type == 'emoji':
-                    self.send_emoji(groupId=groupId, md5=msg.md5, length=msg.length)
+                    await self.api_message.send_group_emoji(group_id=groupId, md5=msg.md5, length=msg.length)
                 elif msg.type == 'ref_for_others' or msg.type == 'ref_for_bot':
                     formatted_reply = '{0}\n---\n{1}'.format(msg.content, msg.query)
-                    self.send_message(groupId=groupId, text=formatted_reply)
+                    await self.api_message.send_group_message(group_id=groupId, text=formatted_reply)
                 elif msg.type == 'link':
                     thumbnail = msg.thumb_url if msg.thumb_url else 'https://deploee.oss-cn-shanghai.aliyuncs.com/icon.jpg'
-                    self.send_url(groupId=groupId, description=msg.desc, title=msg.title, thumb_url=thumbnail, url=msg.url)
+                    await self.api_message.send_group_url(group_id=groupId, description=msg.desc, title=msg.title, thumb_url=thumbnail, url=msg.url)
+                
                 await asyncio.sleep(random.uniform(0.2, 2.0))
 
         async def msg_callback(request):
