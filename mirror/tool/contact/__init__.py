@@ -4,7 +4,9 @@ from typing import override, List
 from kosong.tooling import CallableTool2, ToolOk, ToolReturnValue
 from pydantic import BaseModel, Field
 from kimi_cli.tools.utils import load_desc
-from ..primitive import parse_multiline_json_objects_async
+from ...primitive import parse_multiline_json_objects_async, try_load_text
+import inspect
+import os
 
 class GetContactParams(BaseModel):
     wc_ids: List[str] = Field(description="微信用户ID列表，最多支持20个ID，用英文逗号分隔")
@@ -48,14 +50,14 @@ class ListFriendInGroup(CallableTool2[ListFriendInGroupParams]):
 
     @override
     async def __call__(self, params: ListFriendInGroupParams) -> ToolReturnValue:
-        current_file = inspect.getfile(self.__class__)
-        friend_base_dir = os.path.join(current_file, '..', '..', '..', 'friends')
+        current_file_dir = os.path.dirname(inspect.getfile(self.__class__))
+        friend_base_dir = os.path.join(current_file_dir, '..', '..', '..', 'data', 'friends')
         ## list 出无 basic.md 且有 bio.md 的人， group_segment.jsonl 取第一个消息拿 group_id
         
         result = []
         for wxid in os.listdir(path=friend_base_dir):
             # @chatroom or @openim
-            if '@' in dirname:
+            if '@' in wxid:
                 continue
             friend_dir = os.path.join(friend_base_dir, wxid)
             basic_path = os.path.join(friend_dir, 'basic.md')
@@ -69,7 +71,7 @@ class ListFriendInGroup(CallableTool2[ListFriendInGroupParams]):
                 continue
             
             group_id = ''
-            async for obj in parse_multiline_json_objects_async(messages_file):
+            async for obj in parse_multiline_json_objects_async(group_segment_path):
                 if obj.get('messageType') == '80001':
                     group_id = obj.get('data', {'fromGroup': ''}).get('fromGroup', '')
                     break
@@ -95,23 +97,20 @@ class ListPrivateFriend(CallableTool2[ListPrivateFriendParams]):
 
     @override
     async def __call__(self, params: ListPrivateFriendParams) -> ToolReturnValue:
-        current_file = inspect.getfile(self.__class__)
-        friend_base_dir = os.path.join(current_file, '..', '..', '..', 'friends')
+        current_file_dir = os.path.dirname(inspect.getfile(self.__class__))
+        friend_base_dir = os.path.join(current_file_dir, '..', '..', '..', 'data', 'friends')
         ## list 出有 basic.md 的人
         
         result = []
         for wxid in os.listdir(path=friend_base_dir):
             # @chatroom or @openim
-            if '@' in dirname:
+            if '@' in wxid:
                 continue
             friend_dir = os.path.join(friend_base_dir, wxid)
             basic_path = os.path.join(friend_dir, 'basic.md')
             summary_path = os.path.join(friend_dir, 'summary.md')
             
             if not os.path.exists(basic_path):
-                continue
-            
-            if not group_id:
                 continue
             
             result.append({
@@ -133,14 +132,14 @@ class ListGroup(CallableTool2[ListGroupParams]):
 
     @override
     async def __call__(self, params: ListGroupParams) -> ToolReturnValue:
-        current_file = inspect.getfile(self.__class__)
-        group_base_dir = os.path.join(current_file, '..', '..', '..', 'groups')
+        current_file_dir = os.path.dirname(inspect.getfile(self.__class__))
+        group_base_dir = os.path.join(current_file_dir, '..', '..', '..', 'groups')
         ## list 出有 basic.md 的 group
         
         result = []
         for group_id in os.listdir(path=group_base_dir):
             # @chatroom or @openim
-            if '@' in dirname:
+            if '@' in group_id:
                 continue
             group_dir = os.path.join(group_base_dir, group_id)
             bio_path = os.path.join(group_dir, 'bio.md')
