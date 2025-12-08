@@ -13,7 +13,7 @@ from typing import List, Dict, Any
 from loguru import logger
 from ..primitive import json_parser
 from ..prompt import FRIEND_BIO
-from ..primitive import parse_multiline_json_objects_async
+from ..primitive import parse_multiline_json_objects_async, try_load_text
 from ..primitive import LLM
 from datetime import datetime
 
@@ -63,22 +63,12 @@ class Person(ABC):
         await self.brief_bio(name=name)
         await analysis()
 
-    async def try_load_text(self, path) -> str:
-        text = ''
-        if os.path.exists(path):
-            try:
-                async with aiofiles.open(path, mode='r', encoding='utf-8') as f:
-                    text = await f.read()
-                    text = text.strip()
-            except Exception as e:
-                logger.error(f"读取 {path} 失败: {e}")
-        return text
 
     async def brief_bio(self, name:str) -> str:
         """生成朋友的  bio.md 文件"""
-        basic = await self.try_load_text(self.basic_path)
+        basic = await try_load_text(self.basic_path)
         bio_path = os.path.join(self.wxid_dir, "bio.md")
-        bio = await self.try_load_text(bio_path)
+        bio = await try_load_text(bio_path)
 
         if not basic and not self.memory.private and len(self.memory.group) < 64:
             return "" # 无法生成画像
