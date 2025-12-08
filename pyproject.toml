@@ -39,7 +39,7 @@ dependencies = [
     "lxml>=4.6.0",
     "pytoml>=0.1.0",
     "tenacity>=8.0.0",
-    "kosong>=0.29.0",
+    "kosong>=0.31.0",
 ]
 
 [[tool.uv.index]]

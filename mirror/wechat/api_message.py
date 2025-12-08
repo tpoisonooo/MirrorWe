@@ -55,7 +55,7 @@ class APIMessage:
 
         return None
 
-    async def send_group_message(self, group_id: str, text: str):
+    async def send_group_text(self, group_id: str, text: str):
         headers = {
             'Content-Type': 'application/json',
             'Authorization': self.cookie.auth
@@ -78,7 +78,7 @@ class APIMessage:
 
         return None
 
-    async def send_user_message(self, user_id: str, text: str):
+    async def send_user_text(self, user_id: str, text: str):
         headers = {
             'Content-Type': 'application/json',
             'Authorization': self.cookie.auth

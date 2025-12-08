@@ -392,7 +392,7 @@ class WkteamManager:
                 if msg.type == 'text':
                     username = msg.push_content.split(':')[0].strip()
                     formatted_reply = '{}：{}'.format(username, msg.content)
-                    await self.api_message.send_group_message(group_id=groupId, text=formatted_reply)
+                    await self.api_message.send_group_text(group_id=groupId, text=formatted_reply)
 
                 elif msg.type == 'image':
                     # For forwarding images, we need to download first then upload
@@ -409,7 +409,7 @@ class WkteamManager:
                     await self.api_message.send_group_emoji(group_id=groupId, md5=msg.md5, length=msg.length)
                 elif msg.type == 'ref_for_others' or msg.type == 'ref_for_bot':
                     formatted_reply = '{0}\n---\n{1}'.format(msg.content, msg.query)
-                    await self.api_message.send_group_message(group_id=groupId, text=formatted_reply)
+                    await self.api_message.send_group_text(group_id=groupId, text=formatted_reply)
                 elif msg.type == 'link':
                     thumbnail = msg.thumb_url if msg.thumb_url else 'https://deploee.oss-cn-shanghai.aliyuncs.com/icon.jpg'
                     await self.api_message.send_group_url(group_id=groupId, description=msg.desc, title=msg.title, thumb_url=thumbnail, url=msg.url)

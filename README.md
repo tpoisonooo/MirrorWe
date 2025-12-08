@@ -23,9 +23,9 @@
 
 ## 致谢
 - [ncnn contributors](https://github.com/tencent/ncnn) 提供验证环境
-- [kimi-cli](https://github.com/MoonshotAI/kimi-cli) 工具调用实现
 - [HuixiangDou2](https://github.com/tpoisonooo/HuixiangDou2) Retrieval 研究
 - [HuixiangDou](https://github.com/internlm/huixiangdou) 微信接入方法
+- [kosong](https://github.com/MoonshotAI/kosong) 工具调用抽象
 
 ## 开发随感
 - 20251130 观察到微信群复读导致 modeling 群友出现偏差。例如某人消息里太多“白座”，会认为这个群友是白座。
