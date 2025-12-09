@@ -8,7 +8,7 @@ from .api_contact import APIContact
 from .api_circle import APICircle
 from .api_message import APIMessage
 from .api_manage import APIManage
-from .message import Message, is_revert_command, 
+from .message import Message
 
 __all__ = [
     'APIContact',

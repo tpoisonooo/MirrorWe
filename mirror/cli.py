@@ -20,7 +20,6 @@ import string
 import random
 import time
 import types
-import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from multiprocessing import Process
@@ -37,11 +36,10 @@ from .primitive import safe_write_text
 from .wechat.cookie import Cookie
 from .wechat.message import Message, get_message_log_paths, save_message_to_file
 
-from .mirror import APIContact, APICircle, APIMessage
-from .mirror import Person, Group
-from .mirror.primitive import LLM, get_env_or_raise
-from .mirror.prompt import SUMMARY_BIO
-from .mirror import always_get_an_event_loop
+from .wechat import APIContact, APICircle, APIMessage, APIManage
+from .core import Person, Group
+from .primitive import LLM, get_env_or_raise, always_get_an_event_loop
+from .prompt import SUMMARY_BIO
 
 class WkteamManager:
     """
@@ -140,7 +138,7 @@ class WkteamManager:
                 return web.json_response(text=text)
 
             # 分类保存
-            specific_logpaths = get_message_log_paths(logdir=logdir, message_type=msg._type, sender_id=sender_id, group_id=group_id)
+            specific_logpaths = get_message_log_paths(logdir=logdir, message_type=msg._type, sender_id=msg.sender_id, group_id=msg.group_id)
             await save_message_to_file(specific_logpaths, input_json)
 
             # 3. 是否需要撤回
@@ -218,7 +216,51 @@ async def init_basic(api_contact, targets: List[str], _type: str) -> None:
             logger.error(f"处理联系人批次失败: {e}")
             continue
 
-async def main():
+async def init_friends_groups_basic():
+    api_contact = APIContact()
+    ## 初始化群和好友的 bio.md 文件
+    contacts = await api_contact.get_address_book()
+    friends = contacts.get('friends', [])
+    groups = contacts.get('chatrooms', [])
+    
+    logger.info(f"Found {len(friends)} friends and {len(groups)} groups")
+    
+    # Process friends
+    if friends:
+        logger.info("Processing friends...")
+        await init_basic(api_contact, friends, 'friend')
+    
+    # Process groups
+    if groups:
+        logger.info("Processing groups...")
+        await init_basic(api_contact, groups, 'group')
+
+    ## 对每个群友+好友，进行画像初始化
+    current_file = inspect.getfile(inspect.currentframe())
+    friend_dir = os.path.join(os.path.dirname(current_file), "..", "data", "friends")
+    
+    # Ensure friend directory exists
+    os.makedirs(friend_dir, exist_ok=True)
+    
+    # Get existing friend directories
+    existing_friends = set()
+    if os.path.exists(friend_dir):
+        existing_friends = set(os.listdir(friend_dir))
+    
+    # Combine friends from API and existing directories
+    person_list = list(set(friends) | existing_friends)
+    
+    logger.info(f"Initializing profiles for {len(person_list)} people...")
+    
+    for wxid in tqdm(person_list):
+        logger.debug(f"Initializing profile for {wxid}")
+        p = Person(wxid=wxid)
+        await p.update()
+            
+    logger.info("Profile initialization completed")
+    
+
+def main():
     """Parse args."""
     parser = argparse.ArgumentParser(description='wechat server.')
     parser.add_argument('--login',

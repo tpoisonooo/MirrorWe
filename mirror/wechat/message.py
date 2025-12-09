@@ -1,4 +1,8 @@
 from loguru import logger
+from typing import List, Union
+import xml.etree.ElementTree as ET
+import json
+import os
 
 class Message:
 
@@ -34,7 +38,6 @@ class Message:
         if not data or type(data) is not dict:
             return Exception('data None or not Dict, skip')
 
-
         # format user input
         query = ''
         atlist = data.get('atlist', [])
@@ -57,7 +60,7 @@ class Message:
             if displayname == self.BOT_NAME:
                 displayname = ''
             displaycontent = search_key(xml_key='content')
-            content = '{}:{}'.format(displayname, displaycontent)
+            content = f'{displayname}:{displaycontent}'
             to_user = search_key(xml_key='chatusr')
             
             if to_user != bot_wxid:

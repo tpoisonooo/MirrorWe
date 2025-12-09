@@ -41,12 +41,25 @@ class Group(ABC):
         self.threshold = 4096
         self.max_keep = 1024
 
+        # 文件最小值
+        self.min_file_size_kb = 64 * 1024
+
+    async def should_process(self) -> bool:                                                                                                
+        """判断是否应该处理该实体"""                                                                                                       
+        try:                                                                                                                               
+            stat = await aiofiles.os.stat(self.message_path)                                                                               
+            file_size = stat.st_size                                                                                                       
+            has_basic = await aiofiles.os.path.exists(self.basic_path)                                                                     
+            return file_size >= self.min_file_size  or has_basic                                                                     
+        except:                                                                                                                            
+            return False
+
     async def update(self):
         # 尝试加载本地消息数据
         group_file_size = os.path.getsize(self.group_path) if os.path.exists(self.group_path) else 0
 
         # 没啥消息的空群，跳过
-        if group_file_size < 32*1024 and not os.path.exists(self.basic_path):
+        if not await self.should_process():
             return
 
         await self.load_local([self.group_path])
