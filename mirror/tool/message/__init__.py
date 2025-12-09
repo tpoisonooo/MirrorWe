@@ -38,12 +38,6 @@ class SendGroupUrlParams(BaseModel):
 class RevertAllParams(BaseModel):
     pass  # 无参数
 
-
-class DownloadImageParams(BaseModel):
-    param: dict = Field(description="消息参数字典，包含content、msgId、wId等字段")
-    data_dir: str = Field(description="数据存储目录路径，用于保存下载的图片")
-
-
 class SendGroupImage(CallableTool2[SendGroupImageParams]):
     name: str = "SendGroupImage"
     description: str = load_desc(Path(__file__).parent / "send_group_image.md", {})

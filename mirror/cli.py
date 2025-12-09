@@ -87,32 +87,41 @@ class WkteamManager:
             
             for group_id, _ in self.cookie.group_whitelist.items():
                 # 开始循环转发，每次睡眠一会儿
+                if group_id == msg.group_id:
+                    # 发送方就是在这个群发消息，不用转。
+                    continue
+
                 logger.info(str(msg.__dict__))
-                if msg.type == 'text':
-                    username = msg.push_content.split(':')[0].strip()
-                    formatted_reply = '{}：{}'.format(username, msg.content)
-                    await self.api_message.send_group_text(group_id=group_id, text=formatted_reply)
 
-                elif msg.type == 'image':
-                    # For forwarding images, we need to download first then upload
-                    if msg.url:
-                        await self.api_message.send_group_image(group_id=group_id, image_url=msg.url)
-                    else:
-                        # Download image first using stored image data
-                        param = {'wId': self.cookie.wId, 'content': msg.image_content, 'msgId': msg.image_msg_id}
-                        image_url, _ = await self.api_message.download_image(param, self.cookie.data_dir)
+                match msg.type:
+                    case 'text':
+                        username = msg.push_content.split(':')[0].strip()
+                        formatted_reply = '{}：{}'.format(username, msg.content)
+                        await self.api_message.send_group_text(group_id=group_id, text=formatted_reply)
 
-                        if image_url:
-                            await self.api_message.send_group_image(group_id=group_id, image_url=image_url)
-                elif msg.type == 'emoji':
-                    await self.api_message.send_group_emoji(group_id=group_id, md5=msg.md5, length=msg.length)
-                elif msg.type == 'ref_for_others' or msg.type == 'ref_for_bot':
-                    formatted_reply = '{0}\n---\n{1}'.format(msg.content, msg.query)
-                    await self.api_message.send_group_text(group_id=group_id, text=formatted_reply)
-                elif msg.type == 'link':
-                    thumbnail = msg.thumb_url if msg.thumb_url else 'https://deploee.oss-cn-shanghai.aliyuncs.com/icon.jpg'
-                    await self.api_message.send_group_url(group_id=group_id, description=msg.desc, title=msg.title, thumb_url=thumbnail, url=msg.url)
+                    case 'image':
+                        # For forwarding images, we need to download first then upload
+                        if msg.url:
+                            await self.api_message.send_group_image(group_id=group_id, image_url=msg.url)
+                        else:
+                            # Download image first using stored image data
+                            param = {'wId': self.cookie.wId, 'content': msg.image_content, 'msgId': msg.image_msg_id}
+                            image_url, _ = await self.api_message.download_image(param, self.cookie.data_dir)
+
+                            if image_url:
+                                await self.api_message.send_group_image(group_id=group_id, image_url=image_url)
+                    
+                    case 'emoji':
+                        await self.api_message.send_group_emoji(group_id=group_id, md5=msg.md5, length=msg.length)
+                    
+                    case 'ref_for_others' | 'ref_for_bot':
+                        formatted_reply = '{0}\n---\n{1}'.format(msg.content, msg.query)
+                        await self.api_message.send_group_text(group_id=group_id, text=formatted_reply)
                 
+                    case 'link':
+                        thumbnail = msg.thumb_url if msg.thumb_url else 'https://deploee.oss-cn-shanghai.aliyuncs.com/icon.jpg'
+                        await self.api_message.send_group_url(group_id=group_id, description=msg.desc, title=msg.title, thumb_url=thumbnail, url=msg.url)
+                    
                 await asyncio.sleep(random.uniform(0.5, 2.0))
 
         async def msg_callback(request):

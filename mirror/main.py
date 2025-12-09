@@ -13,36 +13,10 @@ from kosong.message import Message
 from kosong.tooling import CallableTool2, ToolError, ToolOk, ToolResult, ToolReturnValue, Toolset
 from kosong.tooling.simple import SimpleToolset
 
-
-class BashToolParams(BaseModel):
-    command: str
-    """The bash command to execute."""
-
-
-class BashTool(CallableTool2[BashToolParams]):
-    name: str = "Bash"
-    description: str = "Execute a bash command."
-    params: type[BashToolParams] = BashToolParams
-
-    async def __call__(self, params: BashToolParams) -> ToolReturnValue:
-        proc = await asyncio.create_subprocess_shell(
-            params.command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await proc.communicate()
-        stdout_text = stdout.decode().strip()
-        stderr_text = stderr.decode().strip()
-        output_text = "\n".join(filter(None, [stdout_text, stderr_text]))
-        if proc.returncode == 0:
-            return ToolOk(output=output_text)
-        else:
-            return ToolError(
-                output=output_text,
-                message=f"Command failed with exit code {proc.returncode}",
-                brief="Bash command failed.",
-            )
-
+from .tool.circle import GetCircle, SnsPraise, SnsComment, SnsSend
+from .tool.contact import ListGroup, ListPrivateFriend, ListFriendInGroup, SearchAndAdd, GetContact
+from .tool.message import RevertAll, SendGroupUrl, SendGroupEmoji, SendGroupText, SendGroupImage, SendUserText
+from .tool.think import Think
 
 async def agent_loop(chat_provider: ChatProvider, toolset: Toolset):
     system_prompt = "You are a helpful assistant."
@@ -56,8 +30,11 @@ async def agent_loop(chat_provider: ChatProvider, toolset: Toolset):
             break
 
         history.append(Message(role="user", content=user_input))
-
-        while True:
+        
+        step = 0
+        max_step_size = 20
+        while step < max_step_size:
+            step += 1
             result = await kosong.step(
                 chat_provider=chat_provider,
                 system_prompt=system_prompt,
@@ -91,6 +68,39 @@ def tool_result_to_message(result: ToolResult) -> Message:
     )
 
 
+# from .tool.circle import GetCircle, SnsPraise, SnsComment, SnsSend
+# from .tool.contact import ListGroup, ListPrivateFriend, ListFriendInGroup, SearchAndAdd, GetContact
+# from .tool.message import RevertAll, SendGroupUrl, SendGroupEmoji, SendGroupText, SendGroupImage, SendUserText
+# from .tool.think import Think
+
+
+async def build_toolset():
+    toolset = SimpleToolset()
+    # 朋友圈相关
+    toolset += GetCircle()
+    toolset += SnsPraise()
+    toolset += SnsComment()
+    toolset += SnsSend()
+
+    # 联系人相关
+    toolset += ListGroup()
+    toolset += ListPrivateFriend()
+    toolset += ListFriendInGroup()
+    toolset += SearchAndAdd()
+    toolset += GetContact()
+
+    # 消息相关
+    toolset += RevertAll()
+    toolset += SendGroupUrl()
+    toolset += SendGroupEmoji()
+    toolset += SendGroupText()
+    toolset += SendGroupImage()
+    toolset += SendUserText()
+
+    # 思考
+    toolset += Think()
+    return toolset
+
 async def main():
     load_dotenv()
 
@@ -99,11 +109,6 @@ async def main():
         "provider",
         choices=["kimi", "openai", "anthropic", "google"],
         help="The chat provider to use.",
-    )
-    parser.add_argument(
-        "--with-bash",
-        action="store_true",
-        help="Enable Bash tool.",
     )
     args = parser.parse_args()
 
@@ -124,41 +129,9 @@ async def main():
             model = model or "kimi-k2-turbo-preview"
 
             chat_provider = Kimi(base_url=base_url, api_key=api_key, model=model)
-        case "openai":
-            from kosong.contrib.chat_provider.openai_responses import OpenAIResponses
 
-            base_url = base_url or "https://api.openai.com/v1"
-            assert api_key is not None, "Expect OPENAI_API_KEY environment variable"
-            model = model or "gpt-5"
-
-            chat_provider = OpenAIResponses(base_url=base_url, api_key=api_key, model=model)
-        case "anthropic":
-            from kosong.contrib.chat_provider.anthropic import Anthropic
-
-            base_url = base_url or "https://api.anthropic.com"
-            assert api_key is not None, "Expect ANTHROPIC_API_KEY environment variable"
-            model = model or "claude-sonnet-4-5"
-
-            chat_provider = Anthropic(
-                base_url=base_url, api_key=api_key, model=model, default_max_tokens=50_000
-            )
-        case "google":
-            from kosong.contrib.chat_provider.google_genai import GoogleGenAI
-
-            api_key = api_key or os.getenv("GEMINI_API_KEY")
-            assert api_key is not None, (
-                "Expect GOOGLE_API_KEY or GEMINI_API_KEY environment variable"
-            )
-            model = model or "gemini-3-pro-preview"
-            chat_provider = GoogleGenAI(
-                base_url=base_url, api_key=api_key, model=model
-            ).with_thinking("high")
-
-    toolset = SimpleToolset()
-    if with_bash:
-        toolset += BashTool()
-
-    await agent_loop(chat_provider, toolset)
-
+    toolset = await build_toolset()
+    # 找到 Yoh 的联系方式，想办法给他发条消息，就说：“你的代码崩溃了”
+    await agent_loop(chat_provider, toolset, args.task)
 
 asyncio.run(main())
