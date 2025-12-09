@@ -13,7 +13,7 @@ from typing import List, Dict, Any
 from loguru import logger
 from ..primitive import json_parser
 from ..prompt import GROUP_BIO
-from ..primitive import parse_multiline_json_objects_async, try_load_text
+from ..primitive import parse_multiline_json_objects_async, dump_multiline_json_objects_async, try_load_text
 from ..primitive import LLM
 from datetime import datetime
 
@@ -36,7 +36,12 @@ class Group(ABC):
         self.group_path = os.path.join(self.wxid_dir, "message.jsonl")
         self.llm = LLM()
 
-    async def initialize(self):
+        # 群聊累计达到 threshold 条消息，就只保留末尾 max_keep 条有效的
+        # 同时开始更新 bio
+        self.threshold = 4096
+        self.max_keep = 1024
+
+    async def update(self):
         # 尝试加载本地消息数据
         group_file_size = os.path.getsize(self.group_path) if os.path.exists(self.group_path) else 0
 
@@ -44,8 +49,10 @@ class Group(ABC):
         if group_file_size < 32*1024 and not os.path.exists(self.basic_path):
             return
 
-        await self._load_local_messages([self.group_path])
-        await self.brief_bio()
+        await self.load_local([self.group_path])
+        if len(self.memory) >= self.threshold:
+            await self.brief_bio()
+            await self.dump_multiline_json_objects_async(self.group_path, self.memory.group[-self.max_keep:])
 
     async def brief_bio(self) -> str:
         """生成群的  bio.md 文件"""
@@ -76,10 +83,10 @@ class Group(ABC):
         except Exception as e:
             self.bio = str(e)
 
-        with open(bio_path, "w", encoding="utf-8") as f:
-            f.write(self.bio)
+        async with aiofiles.open(bio_path, 'w', encoding='utf-8') as f:
+            await f.write(self.bio)
 
-    async def _load_local_messages(self, message_files: List[str]):
+    async def load_local(self, message_files: List[str]):
         """加载 message.jsonl 文件"""
         try:
             total_loaded = 0

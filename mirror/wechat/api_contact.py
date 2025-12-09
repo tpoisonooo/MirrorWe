@@ -73,8 +73,6 @@ class APIContact:
         https://wkteam.cn/api-wen-dang2/hao-you-cao-zuo/addFriend.html
         """
 
-        import pdb
-        pdb.set_trace()
         if not phone and not id:
             return 'Parameter error, input phone number or wechat id.'
 
@@ -130,7 +128,10 @@ class APIContact:
         return 'Success, please wait for verification. About 10 minutes later, you can check the friend list again.'
     
     async def parse_and_accept(self, message: Dict[str, Any]) -> bool:
-        """解析添加好友的消息，并自动同意好友请求"""
+        """
+        解析添加好友的消息，并自动同意好友请求
+        https://wkteam.cn/api-wen-dang2/xiao-xi-jie-shou/shou-xiao-xi/callback.html#30001
+        """
         data = message.get('data', {})
         if not data:
             logger.error('Invalid contact request message data')

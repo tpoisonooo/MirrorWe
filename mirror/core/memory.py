@@ -16,13 +16,13 @@ class MemoryStream:
     def __iter__(self):
         return iter(self.private + self.group + self.moment)
 
-    def add(self, private_chat:Dict[str,Any]=None, group_chat:Dict[str,Any]=None, moment:Dict[str,Any]=None):
-        if private_chat:
-            private_chat['type'] = 'chat'
-            self.private.append(private_chat)
-        if group_chat:
-            group_chat['type'] = 'group_chat'
-            self.group.append(group_chat)
+    def add(self, private:Dict[str,Any]=None, group:Dict[str,Any]=None, moment:Dict[str,Any]=None):
+        if private:
+            private['type'] = 'chat'
+            self.private.append(private)
+        if group:
+            group['type'] = 'group'
+            self.group.append(group)
         if moment:
             moment['type'] = 'moment'
             self.moment.append(moment)

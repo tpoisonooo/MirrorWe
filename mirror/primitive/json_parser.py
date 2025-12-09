@@ -8,8 +8,33 @@ import json
 import asyncio
 import aiofiles
 from typing import AsyncGenerator, Optional
-from typing import Any, List  # 为了兼容性单独导入
+from typing import Any, List
 from loguru import logger
+import os
+
+async def dump_multiline_json_objects_async(file_path: str, objs: List[Any]):
+    """
+    异步保存多行JSON文件，逐对象写入
+    
+    Args:
+        file_path: JSON 文件路径
+        objs: List 对象
+        
+    Yields:
+        解析成功的JSON对象
+        
+    Example:
+        await dump_multiline_json_objects_async('data.jsonl', [{}, {}]):
+    """
+    try:
+        await aiofiles.os.remove(file_path)
+        async with aiofiles.open(file_path, 'a', encoding='utf-8') as f:
+            for obj in objs:
+                json_str = json.dumsp(obj, indent=2, ensure_ascii=False)
+                await f.write(json_str)
+    except Exception as e:
+        logger.error(f"保存文件失败: {file_path}, 错误: {str(e)}")
+        raise
 
 
 async def parse_multiline_json_objects_async(file_path: str) -> AsyncGenerator[Any, None]:
@@ -26,7 +51,6 @@ async def parse_multiline_json_objects_async(file_path: str) -> AsyncGenerator[A
         async for obj in parse_multiline_json_objects_async('data.jsonl'):
             print(obj)
     """
-    import os
     if not os.path.exists(file_path):
         logger.error(f"文件不存在: {file_path}")
         return

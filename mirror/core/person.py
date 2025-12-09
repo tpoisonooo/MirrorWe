@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import List, Dict, Any
 from loguru import logger
 from ..primitive import json_parser
-from ..prompt import FRIEND_BIO
-from ..primitive import parse_multiline_json_objects_async, try_load_text
+from ..prompt import FRIEND_BIO, SUMMARY_BIO
+from ..primitive import parse_multiline_json_objects_async, dump_multiline_json_objects_async, try_load_text
 from ..primitive import LLM
 from datetime import datetime
 
@@ -39,33 +39,35 @@ class Person(ABC):
         self.basic_path = os.path.join(self.wxid_dir, "basic.json")
         self.private_path = os.path.join(self.wxid_dir, "message.jsonl")
         self.group_path = os.path.join(self.wxid_dir, "group_segment.jsonl")
-        self.llm = LLM() 
+        self.llm = LLM()
+        
+        # 群聊、私聊累计达到 threshold 条消息，就只保留末尾 max_keep 条有效的
+        # 同时开始更新 bio
+        self.threshold = 256
+        self.max_keep = 128
 
-    async def initialize(self):
+    async def update(self):
         # 尝试加载本地消息数据
         group_file_size = os.path.getsize(self.group_path) if os.path.exists(self.group_path) else 0
-
-        # 群里不说话、也不是微信直接好友的（没有 basic），跳过
+        # 群里不说话、也不是微信直接好友的（没有 basic），跳过节约时间
         if group_file_size < 16*1024 and not os.path.exists(self.basic_path):
             return
 
-        name = await self._load_local_messages([self.private_path, self.group_path])
-        
-        async def analysis():
-            # 经典统计
-            if self.memory:
-                await self._analyze_personality()
-                await self._setup_personality_from_analysis()
-                logger.info(f"Person {self.wxid}: 加载了 {len(self.memory)} 条消息，完成个性分析")
-            else:
-                logger.info(f"Person {self.wxid}: 没有找到本地消息数据，使用默认个性")
-        
-        await self.brief_bio(name=name)
-        await analysis()
+        name = await self.load_local([self.private_path, self.group_path])
 
+        if len(self.memory) >= self.threshold:
+            # 触发更新
+            import pdb; pdb.set_trace()
+            await self.brief_bio(name=name)
+            await dump_multiline_json_objects_async(elf.group_path, self.memory.group[-self.max_keep:])
+            await dump_multiline_json_objects_async(self.private_path, self.memory.private[-self.max_keep:])
+
+        await self._analyze_personality()
+        await self._setup_personality_from_analysis()
+        logger.info(f"Person {self.wxid}: 加载了 {len(self.memory)} 条消息，完成个性分析")
 
     async def brief_bio(self, name:str) -> str:
-        """生成朋友的  bio.md 文件"""
+        """生成朋友的  bio.md 文件，做个 summary.md"""
         basic = await try_load_text(self.basic_path)
         bio_path = os.path.join(self.wxid_dir, "bio.md")
         bio = await try_load_text(bio_path)
@@ -98,10 +100,18 @@ class Person(ABC):
             self.bio = await self.llm.chat_text(prompt)
         except Exception as e:
             self.bio = str(e)
-        with open(bio_path, "w", encoding="utf-8") as f:
-            f.write(self.bio)
 
-    async def _load_local_messages(self, message_files: List[str]):
+        async with aiofiles.open(bio_path, 'w', encoding='utf-8') as f:
+            await f.write(self.bio)
+
+        prompt = SUMMARY_BIO.format(bio=self.bio)
+        summary = await llm.chat_text(prompt=prompt)
+        summary_path = os.path.join(self.wxid_dir, 'summary.md')
+        async with aiofiles.open(summary_path, 'w', encoding='utf-8') as f:
+            await f.write(summary)
+            logger.info(f"Written summary {summary}")
+
+    async def load_local(self, message_files: List[str]):
         """加载 message.jsonl 和 group_segment.jsonl 文件"""
 
         name = '某位好友'
@@ -127,16 +137,16 @@ class Person(ABC):
                             message = {"content":f"{self.TAG_ME}:{content}", "ts":ts}
                         else:
                             message = {"content":f"{name}:{content}", "ts":ts}
-                        self.memory.add(private_chat=message)
+                        self.memory.add(private=message)
                         file_loaded += 1
                     elif obj.get('messageType') == '80001':
                         message = {"content":f"{name}:{content}", "ts":ts}
-                        self.memory.add(group_chat=message)
+                        self.memory.add(group=message)
                         file_loaded += 1
                 
                 total_loaded += file_loaded
                 logger.info(f"从 {messages_file} 加载了 {file_loaded} 条有效消息")
-            
+
             logger.info(f"总共加载了 {total_loaded} 条有效消息")
             
         except Exception as e:

@@ -12,7 +12,7 @@ class APICircle:
     def __init__(self):
         self.cookie = Cookie()
 
-    async def get_circle(self, wx_id:str) -> Dict[str, Any]:
+    async def get_circle(self, wxid:str) -> Dict[str, Any]:
         """
         获取好友首页朋友圈 https://wkteam.cn/api-wen-dang2/peng-you-quan/getFriendCircle.html
         目前只实现首页。
@@ -23,7 +23,7 @@ class APICircle:
         }
         data = {
             'wId': self.cookie.wId,
-            'wcId': wx_id,
+            'wcId': wxid,
             'firstPageMd5': "",
             'maxId': 0,
         }
@@ -116,6 +116,19 @@ class APICircle:
             return False
         
         return True
+
+    async def sns_praise_first_one(self, wxid: str):
+        """
+        查找最近的朋友圈，点赞
+        """
+        if not wxid:
+            logger.warning(f'{__file__} sns_praise_first_one input empty')
+        try:
+            circle_data = await self.get_circle(wxid)
+            sns_id = circle_data.get('sns', [])[0].get('id')
+            await self.sns_praise(sns_id)
+        except Exception as e:
+            logger.warning(f'No circle found')
     
     async def sns_send(self, content: str) -> Dict[str, Any]:
         """

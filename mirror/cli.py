@@ -7,17 +7,187 @@ import argparse
 import sys
 import pdb
 from loguru import logger
-from mirror import APIContact, APICircle, APIMessage
-from mirror import Person, Group
-from mirror.primitive import LLM, get_env_or_raise
-from mirror.prompt import SUMMARY_BIO
-from mirror import always_get_an_event_loop
 import inspect
 import json
 import os
 import aiofiles
+
+import asyncio
+import requests
+import hashlib
+import re
+import string
+import random
+import time
+import types
+import xml.etree.ElementTree as ET
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from multiprocessing import Process
 from typing import List, Any, Dict
 from tqdm.asyncio import tqdm
+
+from aiohttp import web
+from bs4 import BeautifulSoup as BS
+from loguru import logger
+from readability import Document
+from dotenv import load_dotenv
+from primitive import get_env_or_raise, get_env_with_default
+from .wechat.cookie import Cookie
+from .wechat.api_message import APIMessage
+from .wechat.api_contact import APIContact
+from .wechat.api_manage import APIManage
+from .wechat.message import Message, get_message_log_paths, save_message_to_file
+
+from .mirror import APIContact, APICircle, APIMessage
+from .mirror import Person, Group
+from .mirror.primitive import LLM, get_env_or_raise
+from .mirror.prompt import SUMMARY_BIO
+from .mirror import always_get_an_event_loop
+
+class WkteamManager:
+    """
+    1. wkteam Login, see http://121.229.29.88:6327/
+    2. Handle wkteam wechat message call back
+    """
+
+    def __init__(self):
+        """init with environment variables."""
+
+        self.cookie = Cookie()
+        self.preprocessed = set()
+
+        # API message handler
+        self.api_message = APIMessage()
+        self.api_manage = APIManage()
+        self.api_contact = APIContact()
+        
+    def bind(self, forward:bool=False):
+        logdir = self.cookie.data_dir
+        port = self.cookie.callback_port
+        os.makedirs(logdir, exist_ok=True)
+        
+        async def forward_to_groups(msg: Message):
+            """跨群转发"""
+            if msg.new_msg_id in self.preprocessed:
+                # 重复的消息，不处理
+                print(f'{msg.new_msg_id} repeated, skip')
+                return
+            self.preprocessed.add(msg.new_msg_id)
+            
+            # 不是白名单群里的消息，不转发
+            come_from_whitelist = False
+            for group_id, groupname in self.cookie.group_whitelist.items():
+                if msg.group_id == group_id:
+                    come_from_whitelist = True
+                    break
+            if not come_from_whitelist:
+                return
+
+            # 自己发的消息，不转发
+            if msg.is_self:
+                # self message, skip
+                return
+            
+            for group_id, _ in self.cookie.group_whitelist.items():
+                # 开始循环转发，每次睡眠一会儿
+                logger.info(str(msg.__dict__))
+                if msg.type == 'text':
+                    username = msg.push_content.split(':')[0].strip()
+                    formatted_reply = '{}：{}'.format(username, msg.content)
+                    await self.api_message.send_group_text(group_id=group_id, text=formatted_reply)
+
+                elif msg.type == 'image':
+                    # For forwarding images, we need to download first then upload
+                    if msg.url:
+                        await self.api_message.send_group_image(group_id=group_id, image_url=msg.url)
+                    else:
+                        # Download image first using stored image data
+                        param = {'wId': self.cookie.wId, 'content': msg.image_content, 'msgId': msg.image_msg_id}
+                        image_url, _ = await self.api_message.download_image(param, self.cookie.data_dir)
+
+                        if image_url:
+                            await self.api_message.send_group_image(group_id=group_id, image_url=image_url)
+                elif msg.type == 'emoji':
+                    await self.api_message.send_group_emoji(group_id=group_id, md5=msg.md5, length=msg.length)
+                elif msg.type == 'ref_for_others' or msg.type == 'ref_for_bot':
+                    formatted_reply = '{0}\n---\n{1}'.format(msg.content, msg.query)
+                    await self.api_message.send_group_text(group_id=group_id, text=formatted_reply)
+                elif msg.type == 'link':
+                    thumbnail = msg.thumb_url if msg.thumb_url else 'https://deploee.oss-cn-shanghai.aliyuncs.com/icon.jpg'
+                    await self.api_message.send_group_url(group_id=group_id, description=msg.desc, title=msg.title, thumb_url=thumbnail, url=msg.url)
+                
+                await asyncio.sleep(random.uniform(0.5, 2.0))
+
+        async def msg_callback(request):
+            """消息回调"""
+            input_json = await request.json()
+            logger.debug(input_json)
+
+            # 1. 首先记录原始消息到 origin.jsonl
+            # 原始消息日志文件路径
+            origin_logpath = os.path.join(logdir, 'origin.jsonl')
+            await save_message_to_file(origin_logpath, input_json)
+
+            # 2. 根据消息类型分别记录到对应的文件
+            msg = Message()
+            err = msg.parse(wx_msg=input_json, bot_wxid=self.cookie.wcId, auth=self.cookie.auth, wkteam_ip_port=self.cookie.WKTEAM_IP_PORT)
+            if err is not None:
+                logger.error(str(err))
+                return web.json_response(text=str(e))
+
+            if not msg.sender_id and not msg.group_id:
+                text = 'Neither sender_id nor group_id available.'
+                logger.warning(text)
+                return web.json_response(text=text)
+
+            # 分类保存
+            specific_logpaths = get_message_log_paths(logdir=logdir, message_type=msg._type, sender_id=sender_id, group_id=group_id)
+            await save_message_to_file(specific_logpaths, input_json)
+
+            # 3. 是否需要撤回
+            if msg.need_revert():
+                await self.api_message.revert_all()
+                return web.json_response(text='revert all messages')
+
+            if '00000' in msg._type:
+                # wkteam 的消息，不处理
+                return web.json_response(text='skip 00000')
+
+            if '30001' in msg._type:
+                # 4. 自动同意所有好友添加，不再交给 agent 处理
+                await asyncio.sleep(random.uniform(1, 10))
+                await self.api_contact.parse_and_accept(input_json)
+                await sns_praise_first_one(input_json.get('data', {'fromUser':''}).get('fromUser', ''))
+                return web.json_response(text='accept user')
+
+            elif '60001' in msg._type:
+                # 5. 如果私聊消息，更新发送人记录
+                await Person(wxid=msg.sender_id).update()
+
+            elif '80001' in msg._type:
+                # 6. 如果群聊消息，更新发送人和群记录
+                await Person(wxid=msg.sender_id).update()
+                await Group(wxid=msg.group_id).update()
+
+            # 7. 是否需要跨群转发
+            if forward:
+                await forward_to_groups(msg)
+            return web.json_response(text='done')
+
+        app = web.Application()
+        app.add_routes([web.post('/callback', msg_callback)])
+        web.run_app(app, host='0.0.0.0', port=port)
+
+    async def serve(self, forward:bool=False):
+        if True:
+            self.bind(forward)
+        else:
+            p = Process(target=self.bind, args=(forward))
+            p.start()
+            await asycio.sleep(2)
+            await self.api_manage.set_callback()
+            p.join()
 
 async def init_basic(api_contact, targets: List[str], _type: str) -> None:
     """Initialize bio information for contacts or groups."""
@@ -44,104 +214,50 @@ async def init_basic(api_contact, targets: List[str], _type: str) -> None:
                 os.makedirs(wxid_dir, exist_ok=True)
 
                 basic_path = os.path.join(wxid_dir, 'basic.json')
-                with open(basic_path, 'w', encoding='utf-8') as f:
+
+                async with aiofiles.open(bio_path, 'w', encoding='utf-8') as f:
                     basic_str = json.dumps(contact, indent=2, ensure_ascii=False)
-                    f.write(basic_str)
+                    await f.write(basic_str)
+
         except Exception as e:
             logger.error(f"处理联系人批次失败: {e}")
             continue
 
-async def init_friends():
-    try:
-        api_contact = APIContact()
-        ## 初始化群和好友的 bio.md 文件
-        contacts = await api_contact.get_address_book()
-        friends = contacts.get('friends', [])
-        groups = contacts.get('chatrooms', [])
-        
-        logger.info(f"Found {len(friends)} friends and {len(groups)} groups")
-        
-        # Process friends
-        if friends:
-            logger.info("Processing friends...")
-            await init_basic(api_contact, friends, 'friend')
-        
-        # Process groups
-        if groups:
-            logger.info("Processing groups...")
-            await init_basic(api_contact, groups, 'group')
-
-        ## 对每个群友+好友，进行画像初始化
-        current_file = inspect.getfile(inspect.currentframe())
-        friend_dir = os.path.join(os.path.dirname(current_file), "..", "data", "friends")
-        
-        # Ensure friend directory exists
-        os.makedirs(friend_dir, exist_ok=True)
-        
-        # Get existing friend directories
-        existing_friends = set()
-        if os.path.exists(friend_dir):
-            existing_friends = set(os.listdir(friend_dir))
-        
-        # Combine friends from API and existing directories
-        person_list = list(set(friends) | existing_friends)
-        
-        logger.info(f"Initializing profiles for {len(person_list)} people...")
-        
-        for wx_id in tqdm(person_list):
-            logger.debug(f"Initializing profile for {wx_id}")
-            p = Person(wxid=wx_id)
-            await p.initialize()
-                
-        logger.info("Profile initialization completed")
-        
-    except Exception as e:
-        logger.error(f"Main execution failed: {e}")
-        import traceback
-        traceback.print_exc()
-
-async def init_groups():
-    ## 对每个群友+好友，进行画像初始化
-    current_file = inspect.getfile(inspect.currentframe())
-    group_dir = os.path.join(os.path.dirname(current_file), "..", "data", "groups")
-    group_list = os.listdir(group_dir)
-    for wx_id in tqdm(group_list):
-        logger.debug(f"Initializing profile for {wx_id}")
-        g = Group(wxid=wx_id)
-        await g.initialize()
-
-async def init_summary():
-    current_file = inspect.getfile(inspect.currentframe())
-    group_dir = os.path.join(os.path.dirname(current_file), "..", "data", "groups")
-    friend_dir = os.path.join(os.path.dirname(current_file), "..", "data", "friends")
-
-    bio_files = [ os.path.join(group_dir, wxid, 'bio.md') for wxid in os.listdir(group_dir)] + [os.path.join(friend_dir, wxid, 'bio.md') for wxid in os.listdir(friend_dir)]
-    bio_files = filter(lambda x: os.path.exists(x), bio_files)
-    
-    llm = LLM()
-
-    for bio_file in tqdm(bio_files):
-        async with aiofiles.open(bio_file, mode='r', encoding='utf-8') as f:
-            bio = await f.read()
-            bio = bio.strip()
-
-        prompt = SUMMARY_BIO.format(bio=bio)
-        
-        summary = await llm.chat_text(prompt=prompt)
-        summary_path = os.path.join(os.path.dirname(bio_file), 'summary.md')
-        with open(summary_path, 'w', encoding='utf-8') as f:
-            f.write(summary)
-            logger.info(f"Written summary {summary}")
-
 async def main():
-    parser = argparse.ArgumentParser(description="MirrorWe CLI 工具")
-    parser.add_argument('--version', action='version', version='MirrorWe 3.0.0')
-    parser.add_argument('--debug', action='store_true', help='Enable debug mode')
+    """Parse args."""
+    parser = argparse.ArgumentParser(description='wechat server.')
+    parser.add_argument('--login',
+                        action='store_true',
+                        default=False,
+                        help='Step1 Login wkteam')
+
+    parser.add_argument('--basic', 
+                        action='store_true',
+                        default=False,
+                        help='Step2 Fetch friends and groups basic information')
+
+    parser.add_argument('--serve',
+                        action='store_true',
+                        default=True,
+                        help='Step3.1 Bind port and listen WeChat message callback')
+
+    parser.add_argument('--forward',
+                        action='store_true',
+                        default=False,
+                        help='Step3.2 Forward all message to all groups')
     args = parser.parse_args()
-    await init_friends()
-    await init_groups()
-    await init_summary()
-    return 0
+
+    manager = WkteamManager()
+
+    if args.login:
+        await manager.api_manage.login()
+        await manager.api_manage.set_callback()
+
+    if args.basic:
+        await init_friends_groups_basic()
+
+    if args.serve:
+        manager.serve(forward=args.forward)
 
 if __name__ == '__main__':
     loop = always_get_an_event_loop()

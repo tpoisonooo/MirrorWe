@@ -203,9 +203,9 @@ class APIMessage:
                             image_dir, generate_hash_filename(data=data))
                         logger.debug('local path {}'.format(image_path))
                         
-                        with open(image_path, 'wb') as image_file:
+                        async with aiofiles.open(image_path, 'wb') as image_file:
                             async for chunk in resp.content.iter_chunked(1024):
-                                image_file.write(chunk)
+                                await image_file.write(chunk)
                         
                         return image_url, image_path
                     else:

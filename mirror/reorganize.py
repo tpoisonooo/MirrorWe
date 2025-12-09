@@ -16,11 +16,12 @@ import sys
 import asyncio
 from pathlib import Path
 from loguru import logger
-from ..primitive.json_parser import parse_multiline_json_objects_async, parse_multiline_json_objects_sync
-from .proxy import get_message_log_paths, save_message_to_file  
+from .primitive.json_parser import parse_multiline_json_objects_async, parse_multiline_json_objects_sync
+from .cli import get_message_log_paths, save_message_to_file  
+from mirror import always_get_an_event_loop
 
 
-def reorganize_logs_sync(input_jsonl_path: str, output_dir: str):
+async def reorganize_logs_sync(input_jsonl_path: str, output_dir: str):
     """
     同步重新整理日志文件
     
@@ -55,7 +56,7 @@ def reorganize_logs_sync(input_jsonl_path: str, output_dir: str):
         for message in parse_multiline_json_objects_sync(input_jsonl_path):
             try:
                 # 1. 首先记录原始消息到 origin.jsonl
-                save_message_to_file(origin_logpath, message)
+                await save_message_to_file(origin_logpath, message)
                 
                 # 2. 根据消息类型分别记录到对应的文件
                 message_type = str(message.get('messageType', ''))
@@ -69,7 +70,7 @@ def reorganize_logs_sync(input_jsonl_path: str, output_dir: str):
                     specific_logpaths = get_message_log_paths(logdir=output_dir, message_type=message_type, sender_id=sender_id, group_id=group_id)
                     
                     # 保存到对应的分类日志文件
-                    save_message_to_file(specific_logpaths, message)
+                    await save_message_to_file(specific_logpaths, message)
                     
                     # 统计消息类型
                     if message_type.startswith('6'):
@@ -127,7 +128,7 @@ def reorganize_logs(input_jsonl_path: str, output_dir: str):
     """
     return 
 
-def main_sync():
+async def main():
     """同步主函数"""
     if len(sys.argv) != 3:
         print("用法: python reorganize.py <输入jsonl文件路径> <输出目录路径>")
@@ -150,7 +151,7 @@ def main_sync():
     logger.info(f"输入文件: {input_path}")
     logger.info(f"输出目录: {output_path}")
     
-    success = reorganize_logs_sync(str(input_path), str(output_path))
+    success = await reorganize_logs_sync(str(input_path), str(output_path))
     
     if success:
         logger.info("日志重新整理完成!")
@@ -159,4 +160,5 @@ def main_sync():
         sys.exit(1)
 
 if __name__ == '__main__':
-    main_sync()
+    loop = always_get_an_event_loop()
+    loop.run_until_complete(main())

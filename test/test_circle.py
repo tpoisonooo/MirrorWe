@@ -15,7 +15,7 @@ sys.path.insert(0, str(project_root))
 # 现在可以顺利导入
 from mirror import APICircle  # 通过包的 __init__.py 导入
 
-async def test_get_circle(wx_id:str):
+async def test_get_circle(wxid:str):
     """测试获取好友朋友圈"""
     print("初始化 APICircle...")
     api_circle = APICircle()
@@ -23,7 +23,7 @@ async def test_get_circle(wx_id:str):
     print("测试获取好友朋友圈...")
     try:
         # 使用一个模拟的微信ID进行测试
-        circle_data = await api_circle.get_circle(wx_id)
+        circle_data = await api_circle.get_circle(wxid)
         print(f"朋友圈获取成功: {len(circle_data.get('sns', []))} 条动态")
         print(f"首页MD5: {circle_data.get('firstPageMd5', '')}")
         return circle_data
@@ -101,7 +101,7 @@ async def main():
     test_results = []
     
     print("\n1. 测试获取好友朋友圈:")
-    circle_data = await test_get_circle(wx_id='wxid_raxq4pq3emg212')
+    circle_data = await test_get_circle(wxid='wxid_raxq4pq3emg212')
     test_results.append(True if circle_data else False)
 
     sns_id = circle_data.get('sns', [])[0].get('id')

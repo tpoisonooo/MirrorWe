@@ -7,7 +7,7 @@
 from .db import DB
 from .utils import always_get_an_event_loop, get_env_or_raise, get_env_with_default, try_load_text
 from .llm import ChatCache, LLM
-from .json_parser import parse_multiline_json_objects_async, parse_multiline_json_objects_sync
+from .json_parser import parse_multiline_json_objects_async, parse_multiline_json_objects_sync, dump_multiline_json_objects_async
 from .token import encode_string, decode_tokens, judge_language
 from .limitter import RPM, TPM
 
