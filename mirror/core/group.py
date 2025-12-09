@@ -11,7 +11,7 @@ import aiofiles
 from pathlib import Path
 from typing import List, Dict, Any
 from loguru import logger
-from ..prompt import GROUP_BIO
+from ..prompt import GROUP_BIO, SUMMARY_BIO
 from ..primitive import parse_multiline_json_objects_async, dump_multiline_json_objects_async
 from ..primitive import try_load_text, safe_write_text
 from ..primitive import LLM
@@ -24,16 +24,16 @@ from mirror.core.memory import MemoryStream
 class Group(ABC):
     """ Group 类，支持加载本地消息数据"""
     
-    def __init__(self, wxid: str):
-        self.wxid = wxid
+    def __init__(self, group_id: str):
+        self.group_id = group_id
         self.memory = MemoryStream()
         self.bio = ""
 
         current_file = inspect.getfile(self.__class__)
         data_dir = os.path.join(os.path.dirname(current_file), "..", "..", "data")
-        self.wxid_dir = os.path.join(data_dir, 'groups', self.wxid)
-        self.basic_path = os.path.join(self.wxid_dir, "basic.json")
-        self.group_path = os.path.join(self.wxid_dir, "message.jsonl")
+        self.group_dir = os.path.join(data_dir, 'groups', self.group_id)
+        self.basic_path = os.path.join(self.group_dir, "basic.json")
+        self.group_path = os.path.join(self.group_dir, "message.jsonl")
         self.llm = LLM()
 
         # 群聊累计达到 threshold 条消息，就只保留末尾 max_keep 条有效的
@@ -44,22 +44,12 @@ class Group(ABC):
         # 文件最小值
         self.min_file_size_kb = 64 * 1024
 
-    async def should_process(self) -> bool:                                                                                                
-        """判断是否应该处理该实体"""                                                                                                       
-        try:                                                                                                                               
-            stat = await aiofiles.os.stat(self.message_path)                                                                               
-            file_size = stat.st_size                                                                                                       
-            has_basic = await aiofiles.os.path.exists(self.basic_path)                                                                     
-            return file_size >= self.min_file_size  or has_basic                                                                     
-        except:                                                                                                                            
-            return False
-
     async def update(self):
         # 尝试加载本地消息数据
         group_file_size = os.path.getsize(self.group_path) if os.path.exists(self.group_path) else 0
 
         # 没啥消息的空群，跳过
-        if not await self.should_process():
+        if group_file_size < self.min_file_size_kb and not os.path.exists(self.basic_path):
             return
 
         await self.load_local([self.group_path])
@@ -70,15 +60,15 @@ class Group(ABC):
     async def brief_bio(self) -> str:
         """生成群的  bio.md 文件"""
         basic = await try_load_text(self.basic_path)
-        bio_path = os.path.join(self.wxid_dir, "bio.md")
+        bio_path = os.path.join(self.group_dir, "bio.md")
         bio = await try_load_text(bio_path)
 
-        if not basic and not self.memory.private and len(self.memory.group) < 64:
+        if len(self.memory.group) < 64:
             return "" # 无法生成画像
         
         # 按 LLM 最大长度，截断百分之多少上下文
-        max_text_size = self.llm.backend.max_token_size * 2 * 0.7
-        cur_text_size = len(basic) + len(bio) + len(str(self.memory.private)) + len(str(self.memory.group))
+        max_text_size = self.llm.max_token_size * 2 * 0.7
+        cur_text_size = len(basic) + len(bio) + len(str(self.memory.group))
         cut_ratio = max_text_size / cur_text_size
         if cut_ratio > 1.0:
             cut_group_index = 0
@@ -95,8 +85,12 @@ class Group(ABC):
             self.bio = await self.llm.chat_text(prompt)
         except Exception as e:
             self.bio = str(e)
-
         await safe_write_text(bio_path, self.bio)
+
+        prompt = SUMMARY_BIO.format(bio=self.bio)
+        summary = await self.llm.chat_text(prompt=prompt)
+        summary_path = os.path.join(self.group_dir, 'summary.md')
+        await safe_write_text(summary_path, summary)
 
     async def load_local(self, message_files: List[str]):
         """加载 message.jsonl 文件"""
@@ -117,7 +111,7 @@ class Group(ABC):
 
                     if obj.get('messageType') == '80001':
                         message = {"content":f"{name}:{content}", "ts":ts}
-                        self.memory.add(group_chat=message)
+                        self.memory.add(group=message)
                         file_loaded += 1
                 
                 total_loaded += file_loaded

@@ -43,7 +43,7 @@ class Person(ABC):
         
         # 群聊、私聊累计达到 threshold 条消息，就只保留末尾 max_keep 条有效的
         # 同时开始更新 bio
-        self.threshold = 256
+        self.threshold = 512  # AKA 多少条消息，足以刻画这个人
         self.max_keep = 128
 
     async def update(self):
@@ -57,7 +57,6 @@ class Person(ABC):
 
         if len(self.memory) >= self.threshold:
             # 触发更新
-            import pdb; pdb.set_trace()
             await self.brief_bio(name=name)
             await dump_multiline_json_objects_async(self.group_path, self.memory.group[-self.max_keep:])
             await dump_multiline_json_objects_async(self.private_path, self.memory.private[-self.max_keep:])
@@ -76,7 +75,7 @@ class Person(ABC):
             return "" # 无法生成画像
         
         # 按 LLM 最大长度，截断百分之多少上下文
-        max_text_size = self.llm.backend.max_token_size * 2 * 0.7
+        max_text_size = self.llm.max_token_size * 2 * 0.7
         cur_text_size = len(basic) + len(bio) + len(str(self.memory.private)) + len(str(self.memory.group))
         cut_ratio = max_text_size / cur_text_size
         if cut_ratio > 1.0:

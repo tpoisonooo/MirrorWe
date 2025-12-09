@@ -40,6 +40,7 @@ dependencies = [
     "pytoml>=0.1.0",
     "tenacity>=8.0.0",
     "kosong>=0.31.0",
+    "anyio>=4.11.0",
 ]
 
 [[tool.uv.index]]

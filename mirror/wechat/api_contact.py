@@ -24,6 +24,16 @@ class APIContact:
         }
         
         json_obj, err = await async_post(
+            url=f'http://{self.cookie.WKTEAM_IP_PORT}/initAddressList',
+            data=data,
+            headers=headers
+        )
+
+        if err is not None:
+            logger.error(f'Failed to get address book: {err}')
+            return {'chatrooms': [], 'friends': [], 'ghs': [], 'others': []}
+
+        json_obj, err = await async_post(
             url=f'http://{self.cookie.WKTEAM_IP_PORT}/getAddressList',
             data=data,
             headers=headers

@@ -58,7 +58,7 @@ class WkteamManager:
         self.api_manage = APIManage()
         self.api_contact = APIContact()
         
-    def bind(self, forward:bool=False):
+    async def bind(self, forward:bool=False, life:int=3600*7*30*12):
         logdir = self.cookie.data_dir
         port = self.cookie.callback_port
         os.makedirs(logdir, exist_ok=True)
@@ -164,26 +164,29 @@ class WkteamManager:
             elif '80001' in msg._type:
                 # 6. 如果群聊消息，更新发送人和群记录
                 await Person(wxid=msg.sender_id).update()
-                await Group(wxid=msg.group_id).update()
+                await Group(group_id=msg.group_id).update()
 
             # 7. 是否需要跨群转发
             if forward:
                 await forward_to_groups(msg)
             return web.json_response(text='done')
 
+        # async bind，手动管理生命周期
         app = web.Application()
         app.add_routes([web.post('/callback', msg_callback)])
-        web.run_app(app, host='0.0.0.0', port=port)
+        
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, '0.0.0.0', port)
+        logger.info(f'Start async bind 0.0.0.0:{port}..')
+        await site.start()
+        
+        # 继续执行其他任务
+        await asyncio.sleep(3600 * 24 * 30)
+        
+        # 清理
+        await runner.cleanup()
 
-    async def serve(self, forward:bool=False):
-        if True:
-            self.bind(forward)
-        else:
-            p = Process(target=self.bind, args=(forward))
-            p.start()
-            await asyncio.sleep(2)
-            await self.api_manage.set_callback()
-            p.join()
 
 async def init_basic(api_contact, targets: List[str], _type: str) -> None:
     """Initialize bio information for contacts or groups."""
@@ -198,7 +201,7 @@ async def init_basic(api_contact, targets: List[str], _type: str) -> None:
         batch = targets[i:i + MAX_BATCH]
         try:
             contacts_data = await api_contact.get_contact(batch)
-            logger.info(f"处理联系人批次: {len(contacts_data)} 个联系人")
+            logger.info(f"处理批次: {len(contacts_data)} 个联系人/群组")
 
             for contact in contacts_data:
                 wxid = contact.get('userName', '')
@@ -206,11 +209,11 @@ async def init_basic(api_contact, targets: List[str], _type: str) -> None:
                     continue
 
                 # Create individual directory for each contact
-                wxid_dir = os.path.join(data_dir, "friends", wxid)
+                wxid_dir = os.path.join(data_dir, _type, wxid)
                 os.makedirs(wxid_dir, exist_ok=True)
 
                 basic_path = os.path.join(wxid_dir, 'basic.json')
-                await safe_write_text(bio_path, json.dumps(contact, indent=2, ensure_ascii=False))
+                await safe_write_text(basic_path, json.dumps(contact, indent=2, ensure_ascii=False))
 
         except Exception as e:
             logger.error(f"处理联系人批次失败: {e}")
@@ -220,20 +223,26 @@ async def init_friends_groups_basic():
     api_contact = APIContact()
     ## 初始化群和好友的 bio.md 文件
     contacts = await api_contact.get_address_book()
+
     friends = contacts.get('friends', [])
     groups = contacts.get('chatrooms', [])
+
+    if not friends:
+        friends = []
+    if not groups:
+        groups = []
     
     logger.info(f"Found {len(friends)} friends and {len(groups)} groups")
     
     # Process friends
     if friends:
         logger.info("Processing friends...")
-        await init_basic(api_contact, friends, 'friend')
+        await init_basic(api_contact, friends, 'friends')
     
     # Process groups
     if groups:
         logger.info("Processing groups...")
-        await init_basic(api_contact, groups, 'group')
+        await init_basic(api_contact, groups, 'groups')
 
     ## 对每个群友+好友，进行画像初始化
     current_file = inspect.getfile(inspect.currentframe())
@@ -260,7 +269,7 @@ async def init_friends_groups_basic():
     logger.info("Profile initialization completed")
     
 
-def main():
+async def main():
     """Parse args."""
     parser = argparse.ArgumentParser(description='wechat server.')
     parser.add_argument('--login',
@@ -282,6 +291,11 @@ def main():
                         action='store_true',
                         default=False,
                         help='Step3.2 Forward all message to all groups')
+
+    parser.add_argument('--life',
+                        type=int,
+                        default=3600*24*30*12,
+                        help='Seconds the server survive')
     args = parser.parse_args()
 
     manager = WkteamManager()
@@ -294,7 +308,8 @@ def main():
         await init_friends_groups_basic()
 
     if args.serve:
-        manager.serve(forward=args.forward)
+        await manager.bind(args.forward, args.life)
+        await manager.api_manage.set_callback()
 
 if __name__ == '__main__':
     loop = always_get_an_event_loop()

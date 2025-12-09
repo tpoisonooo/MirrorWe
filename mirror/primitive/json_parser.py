@@ -7,6 +7,9 @@
 import json
 import asyncio
 import aiofiles
+import aiofiles.os
+import anyio
+
 from typing import AsyncGenerator, Optional
 from typing import Any, List
 from loguru import logger
@@ -28,10 +31,11 @@ async def dump_multiline_json_objects_async(file_path: str, objs: List[Any]):
     """
     try:
         await aiofiles.os.remove(file_path)
+        await anyio.os.makedirs(anyio.Path(file_path).parent, exist_ok=True)
         async with aiofiles.open(file_path, 'a', encoding='utf-8') as f:
             for obj in objs:
-                json_str = json.dumsp(obj, indent=2, ensure_ascii=False)
-                await f.write(json_str)
+                json_str = json.dumps(obj, indent=2, ensure_ascii=False)
+                await f.write(json_str + '\n')
     except Exception as e:
         logger.error(f"保存文件失败: {file_path}, 错误: {str(e)}")
         raise

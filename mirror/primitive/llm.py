@@ -104,6 +104,7 @@ class LLM:
         self.cache = ChatCache()
         self.rpm = RPM(int(get_env_or_raise('LLM_RPM')))
         self.tpm = TPM(int(get_env_or_raise('LLM_TPM')))
+        self.max_token_size = int(get_env_or_raise('LLM_MAX_TOKEN_SIZE'))
         self.sum_input_token_size = 0
         self.sum_output_token_size = 0
         self.provider = Kimi(model=get_env_or_raise("KIMI_MODEL"))

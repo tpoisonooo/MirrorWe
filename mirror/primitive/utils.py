@@ -3,7 +3,8 @@
 """
 import os
 import asyncio
-
+import aiofiles
+from loguru import logger
 
 async def safe_write_text(file_path: str, content: str) -> bool:                                                                   
     try:                                                                                                                              
@@ -14,21 +15,18 @@ async def safe_write_text(file_path: str, content: str) -> bool:
         logger.error(f"写入文件失败 {file_path}: {e}")                                                                                
         return False
 
-async def try_load_text(self, path, default:str=None) -> str:
+async def try_load_text(path:str, default:str='') -> str:
     text = ''
     
     if not os.path.exists(path):
-        if default is not None:
-            return default 
-        else:
-            raise Exception(f"{path} not exits.")
+        return default
     
-        try:
-            async with aiofiles.open(path, mode='r', encoding='utf-8') as f:
-                text = await f.read()
-                text = text.strip()
-        except Exception as e:
-            logger.error(f"Read {path} failed: {e}")
+    try:
+        async with aiofiles.open(path, mode='r', encoding='utf-8') as f:
+            text = await f.read()
+            text = text.strip()
+    except Exception as e:
+        logger.error(f"Read {path} failed: {e}")
     return text
 
 def always_get_an_event_loop():

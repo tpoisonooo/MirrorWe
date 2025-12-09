@@ -1,6 +1,7 @@
 from loguru import logger
 from typing import List, Union
 import xml.etree.ElementTree as ET
+import aiofiles
 import json
 import os
 
@@ -191,13 +192,10 @@ async def save_message_to_file(file_paths: Union[List[str],str], message: dict):
     """保存消息到指定的jsonl文件"""
     if isinstance(file_paths, str):
         file_paths = [file_paths]
-    try:
-        json_str = json.dumps(message, indent=2, ensure_ascii=False)
-        for file_path in file_paths:
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
-            async with aiofiles.open(file_path, 'a', encoding='utf-8') as f:
-                await f.write(json_str + '\n')
-    except Exception as e:
-        import pdb; pdb.set_trace()
-        logger.error(f"保存消息到文件失败 {file_path}: {str(e)}")
+    json_str = json.dumps(message, indent=2, ensure_ascii=False)
+    for file_path in file_paths:
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+        async with aiofiles.open(file_path, 'a', encoding='utf-8') as f:
+            await f.write(json_str + '\n')

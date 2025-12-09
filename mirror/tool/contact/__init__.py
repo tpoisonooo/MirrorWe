@@ -115,7 +115,7 @@ class ListPrivateFriend(CallableTool2[ListPrivateFriendParams]):
             
             result.append({
                 "basic_info": await try_load_text(basic_path),
-                "personal_summary": await try_load_text(summary_path, ''),
+                "personal_summary": await try_load_text(summary_path),
                 "wxid": wxid,
             })
         
