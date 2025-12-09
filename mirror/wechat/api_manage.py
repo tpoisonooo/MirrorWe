@@ -4,6 +4,7 @@ import json
 from loguru import logger
 from .cookie import Cookie
 from .helper import async_post
+from ..primitive import safe_write_text
 import aiofiles
 import time
 
@@ -65,18 +66,17 @@ class APIManage:
         self.cookie.wcId = x['wcId']
 
         # dump
-        async with aiofiles.open(self.cookie.license_path, 'w', encoding='utf-8') as f:
-            json_str = json.dumps(
-                {
-                    'auth': self.cookie.auth,
-                    'wId': self.cookie.wId,
-                    'wcId': self.cookie.wcId,
-                    'qrCodeUrl': self.qrCodeUrl
-                },
-                indent=2,
-                ensure_ascii=False
-            )
-            await f.write(json_str)
+        json_str = json.dumps(
+            {
+                'auth': self.cookie.auth,
+                'wId': self.cookie.wId,
+                'wcId': self.cookie.wcId,
+                'qrCodeUrl': self.qrCodeUrl
+            },
+            indent=2,
+            ensure_ascii=False
+        )
+        await safe_write_text(self.cookie.license_path, json_str)
  
     async def set_callback(self):
         # set callback url

@@ -15,4 +15,5 @@ __all__ = [
     'APICircle',
     'APIMessage',
     'APIManage',
+    'Message',
 ]

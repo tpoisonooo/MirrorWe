@@ -11,9 +11,9 @@ import aiofiles
 from pathlib import Path
 from typing import List, Dict, Any
 from loguru import logger
-from ..primitive import json_parser
 from ..prompt import FRIEND_BIO, SUMMARY_BIO
-from ..primitive import parse_multiline_json_objects_async, dump_multiline_json_objects_async, try_load_text
+from ..primitive import parse_multiline_json_objects_async, dump_multiline_json_objects_async
+from ..primitive import safe_write_text, try_load_text
 from ..primitive import LLM
 from datetime import datetime
 
@@ -59,7 +59,7 @@ class Person(ABC):
             # 触发更新
             import pdb; pdb.set_trace()
             await self.brief_bio(name=name)
-            await dump_multiline_json_objects_async(elf.group_path, self.memory.group[-self.max_keep:])
+            await dump_multiline_json_objects_async(self.group_path, self.memory.group[-self.max_keep:])
             await dump_multiline_json_objects_async(self.private_path, self.memory.private[-self.max_keep:])
 
         await self._analyze_personality()
@@ -101,15 +101,12 @@ class Person(ABC):
         except Exception as e:
             self.bio = str(e)
 
-        async with aiofiles.open(bio_path, 'w', encoding='utf-8') as f:
-            await f.write(self.bio)
+        await safe_write_text(bio_path, self.bio)
 
         prompt = SUMMARY_BIO.format(bio=self.bio)
-        summary = await llm.chat_text(prompt=prompt)
+        summary = await self.llm.chat_text(prompt=prompt)
         summary_path = os.path.join(self.wxid_dir, 'summary.md')
-        async with aiofiles.open(summary_path, 'w', encoding='utf-8') as f:
-            await f.write(summary)
-            logger.info(f"Written summary {summary}")
+        await safe_write_text(summary_path, summary)
 
     async def load_local(self, message_files: List[str]):
         """加载 message.jsonl 和 group_segment.jsonl 文件"""

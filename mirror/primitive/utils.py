@@ -4,6 +4,16 @@
 import os
 import asyncio
 
+
+async def safe_write_text(file_path: str, content: str) -> bool:                                                                   
+    try:                                                                                                                              
+        async with aiofiles.open(file_path, 'w', encoding='utf-8') as f:                                                              
+            await f.write(content)                                                                                                    
+        return True                                                                                                                   
+    except Exception as e:                                                                                                            
+        logger.error(f"写入文件失败 {file_path}: {e}")                                                                                
+        return False
+
 async def try_load_text(self, path, default:str=None) -> str:
     text = ''
     

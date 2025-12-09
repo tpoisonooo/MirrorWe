@@ -32,11 +32,9 @@ from bs4 import BeautifulSoup as BS
 from loguru import logger
 from readability import Document
 from dotenv import load_dotenv
-from primitive import get_env_or_raise, get_env_with_default
+from .primitive import get_env_or_raise, get_env_with_default
+from .primitive import safe_write_text
 from .wechat.cookie import Cookie
-from .wechat.api_message import APIMessage
-from .wechat.api_contact import APIContact
-from .wechat.api_manage import APIManage
 from .wechat.message import Message, get_message_log_paths, save_message_to_file
 
 from .mirror import APIContact, APICircle, APIMessage
@@ -134,7 +132,7 @@ class WkteamManager:
             err = msg.parse(wx_msg=input_json, bot_wxid=self.cookie.wcId, auth=self.cookie.auth, wkteam_ip_port=self.cookie.WKTEAM_IP_PORT)
             if err is not None:
                 logger.error(str(err))
-                return web.json_response(text=str(e))
+                return web.json_response(text=str(err))
 
             if not msg.sender_id and not msg.group_id:
                 text = 'Neither sender_id nor group_id available.'
@@ -185,7 +183,7 @@ class WkteamManager:
         else:
             p = Process(target=self.bind, args=(forward))
             p.start()
-            await asycio.sleep(2)
+            await asyncio.sleep(2)
             await self.api_manage.set_callback()
             p.join()
 
@@ -214,10 +212,7 @@ async def init_basic(api_contact, targets: List[str], _type: str) -> None:
                 os.makedirs(wxid_dir, exist_ok=True)
 
                 basic_path = os.path.join(wxid_dir, 'basic.json')
-
-                async with aiofiles.open(bio_path, 'w', encoding='utf-8') as f:
-                    basic_str = json.dumps(contact, indent=2, ensure_ascii=False)
-                    await f.write(basic_str)
+                await safe_write_text(bio_path, json.dumps(contact, indent=2, ensure_ascii=False))
 
         except Exception as e:
             logger.error(f"处理联系人批次失败: {e}")

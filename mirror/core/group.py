@@ -11,9 +11,9 @@ import aiofiles
 from pathlib import Path
 from typing import List, Dict, Any
 from loguru import logger
-from ..primitive import json_parser
 from ..prompt import GROUP_BIO
-from ..primitive import parse_multiline_json_objects_async, dump_multiline_json_objects_async, try_load_text
+from ..primitive import parse_multiline_json_objects_async, dump_multiline_json_objects_async
+from ..primitive import try_load_text, safe_write_text
 from ..primitive import LLM
 from datetime import datetime
 
@@ -52,7 +52,7 @@ class Group(ABC):
         await self.load_local([self.group_path])
         if len(self.memory) >= self.threshold:
             await self.brief_bio()
-            await self.dump_multiline_json_objects_async(self.group_path, self.memory.group[-self.max_keep:])
+            await dump_multiline_json_objects_async(self.group_path, self.memory.group[-self.max_keep:])
 
     async def brief_bio(self) -> str:
         """生成群的  bio.md 文件"""
@@ -79,12 +79,11 @@ class Group(ABC):
             group=json.dumps(group, ensure_ascii=False, indent=2))
         # 使用新的LLM适配器
         try:
-            self.bio = await self.llm.chat(prompt)
+            self.bio = await self.llm.chat_text(prompt)
         except Exception as e:
             self.bio = str(e)
 
-        async with aiofiles.open(bio_path, 'w', encoding='utf-8') as f:
-            await f.write(self.bio)
+        await safe_write_text(bio_path, self.bio)
 
     async def load_local(self, message_files: List[str]):
         """加载 message.jsonl 文件"""
