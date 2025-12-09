@@ -3,8 +3,9 @@ from typing import override, List
 
 from kosong.tooling import CallableTool2, ToolOk, ToolReturnValue
 from pydantic import BaseModel, Field
-from kimi_cli.tools.utils import load_desc
 from ...primitive import parse_multiline_json_objects_async, try_load_text
+from ...primitive import load_desc
+
 import inspect
 import os
 

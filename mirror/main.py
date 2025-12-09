@@ -42,6 +42,9 @@ async def agent_loop(chat_provider: ChatProvider, toolset: Toolset):
                 history=history,
             )
 
+            import pdb
+            pdb.set_trace()
+
             tool_results = await result.tool_results()
 
             assistant_message = result.message
@@ -91,10 +94,10 @@ async def build_toolset():
 
     # 消息相关
     toolset += RevertAll()
-    toolset += SendGroupUrl()
-    toolset += SendGroupEmoji()
-    toolset += SendGroupText()
-    toolset += SendGroupImage()
+    # toolset += SendGroupUrl()
+    # toolset += SendGroupEmoji()
+    # toolset += SendGroupText()
+    # toolset += SendGroupImage()
     toolset += SendUserText()
 
     # 思考
@@ -113,7 +116,6 @@ async def main():
     args = parser.parse_args()
 
     provider: Literal["kimi", "openai", "anthropic", "google"] = args.provider
-    with_bash: bool = args.with_bash
 
     provider_upper = provider.upper()
     base_url = os.getenv(f"{provider_upper}_BASE_URL")
@@ -132,6 +134,6 @@ async def main():
 
     toolset = await build_toolset()
     # 找到 Yoh 的联系方式，想办法给他发条消息，就说：“你的代码崩溃了”
-    await agent_loop(chat_provider, toolset, args.task)
+    await agent_loop(chat_provider, toolset)
 
 asyncio.run(main())

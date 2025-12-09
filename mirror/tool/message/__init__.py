@@ -3,8 +3,7 @@ from typing import override, Optional, Tuple
 
 from kosong.tooling import CallableTool2, ToolOk, ToolReturnValue
 from pydantic import BaseModel, Field
-from kimi_cli.tools.utils import load_desc
-
+from ...primitive import load_desc
 
 class SendGroupImageParams(BaseModel):
     group_id: str = Field(description="群聊ID，用于指定发送图片的群聊")

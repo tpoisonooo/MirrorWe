@@ -3,8 +3,7 @@ from typing import override
 
 from kosong.tooling import CallableTool2, ToolOk, ToolReturnValue
 from pydantic import BaseModel, Field
-from kimi_cli.tools.utils import load_desc
-
+from ...primitive import load_desc
 
 class GetCircleParams(BaseModel):
     wx_id: str = Field(description="微信用户ID，用于获取该用户的朋友圈")

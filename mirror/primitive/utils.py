@@ -5,6 +5,15 @@ import os
 import asyncio
 import aiofiles
 from loguru import logger
+from pathlib import Path
+
+
+def load_desc(path: Path, substitutions: dict[str, str] | None = None) -> str:
+    """Load a tool description from a file, with optional substitutions."""
+    description = path.read_text(encoding="utf-8")
+    if substitutions:
+        description = string.Template(description).substitute(substitutions)
+    return description
 
 async def safe_write_text(file_path: str, content: str) -> bool:                                                                   
     try:                                                                                                                              

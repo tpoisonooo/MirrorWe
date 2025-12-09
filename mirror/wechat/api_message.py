@@ -7,6 +7,7 @@ from loguru import logger
 from .cookie import Cookie
 from .helper import async_post
 import time
+import aiofiles
 
 class APIMessage:
     def __init__(self):

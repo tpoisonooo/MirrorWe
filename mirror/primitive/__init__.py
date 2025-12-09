@@ -6,6 +6,7 @@
 
 from .db import DB
 from .utils import always_get_an_event_loop, get_env_or_raise, get_env_with_default, try_load_text, safe_write_text
+from .utils import load_desc
 from .llm import ChatCache, LLM
 from .json_parser import parse_multiline_json_objects_async, parse_multiline_json_objects_sync, dump_multiline_json_objects_async
 from .token import encode_string, decode_tokens, judge_language
@@ -30,6 +31,7 @@ __all__ = [
     'always_get_an_event_loop',
     'get_env_or_raise',
     'get_env_with_default',
+    'load_desc',
 
     # 文件操作
     'safe_write_text',

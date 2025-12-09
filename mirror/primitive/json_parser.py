@@ -30,7 +30,9 @@ async def dump_multiline_json_objects_async(file_path: str, objs: List[Any]):
         await dump_multiline_json_objects_async('data.jsonl', [{}, {}]):
     """
     try:
-        await anyio.os.makedirs(anyio.Path(file_path).parent, exist_ok=True)
+        # os.makedirs(os.path.basename(file_path), exist_ok=True)
+        await anyio.Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+
         async with aiofiles.open(file_path, 'w', encoding='utf-8') as f:
             for obj in objs:
                 json_str = json.dumps(obj, indent=2, ensure_ascii=False)
