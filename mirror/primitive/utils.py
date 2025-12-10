@@ -16,7 +16,7 @@ def time_string() -> str:
     now = datetime.now(tz)
 
     # 格式化输出
-    return now.strftime("当前时间：%Y年%m月%d日 %H时%M分%S秒 %Z")
+    return now.strftime("当前时间：%Y年%m月%d日 %H时%M分")
 
 def load_desc(path: Path, substitutions: dict[str, str] | None = None) -> str:
     """Load a tool description from a file, with optional substitutions."""

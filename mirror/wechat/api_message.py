@@ -223,7 +223,7 @@ class APIMessage:
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, data=json.dumps(data), headers=headers) as resp:
                     json_str = await resp.text()
-                    logger.debug(json_str)
+                    logger.debug((data, json_str))
                     if resp.status != 200:
                         return None, Exception('wkteam auth fail {}'.format(json_str))
                     json_obj = json.loads(json_str)
