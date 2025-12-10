@@ -51,7 +51,7 @@ class Cookie:
             if key.startswith('GROUP_'):
                 group_id = key.replace('GROUP_', '') + '@chatroom'
                 whitelist[group_id] = value
-                logger.debug(f"Loaded group: {group_id} -> {value}")
+                # logger.debug(f"Loaded group: {group_id} -> {value}")
         return whitelist
 
     def debug(self):

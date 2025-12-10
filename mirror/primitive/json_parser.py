@@ -64,7 +64,7 @@ async def parse_multiline_json_objects_async(file_path: str) -> AsyncGenerator[A
         async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
             content = await f.read()
         
-        logger.debug(f"开始解析文件: {file_path}")
+        # logger.debug(f"开始解析文件: {file_path}")
         
         # 使用栈的方式来正确匹配嵌套的大括号
         current_obj = ""
@@ -128,8 +128,8 @@ async def parse_multiline_json_objects_async(file_path: str) -> AsyncGenerator[A
                 error_count += 1
                 logger.warning(f"最后一个JSON对象解析失败: {str(e)}")
         
-        logger.info(f"文件解析完成: {file_path}")
-        logger.info(f"成功解析: {obj_count} 个对象, 失败: {error_count} 个")
+        # logger.info(f"文件解析完成: {file_path}")
+        # logger.info(f"成功解析: {obj_count} 个对象, 失败: {error_count} 个")
         
     except Exception as e:
         logger.error(f"解析文件失败: {file_path}, 错误: {str(e)}")

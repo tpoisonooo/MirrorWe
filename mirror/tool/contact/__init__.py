@@ -26,7 +26,7 @@ class GetContact(CallableTool2[GetContactParams]):
 
 class SearchAndAddParams(BaseModel):
     phone: str = Field(default=None, description="手机号码，用于搜索添加好友")
-    id: str = Field(default=None, description="微信号，用于搜索添加好友")
+    id: str = Field(default=None, description="微信号，用于搜索添加好友。注意不是 wxid 开头的微信 ID")
 
 class SearchAndAdd(CallableTool2[SearchAndAddParams]):
     name: str = "SearchAndAdd"
@@ -41,19 +41,19 @@ class SearchAndAdd(CallableTool2[SearchAndAddParams]):
         return ToolOk(output=str(result), message=f"搜索添加结果: {result}")
 
 
-class ListFriendInGroupParams(BaseModel):
+class GroupChatFriendParams(BaseModel):
     pass
 
-class ListFriendInGroup(CallableTool2[ListFriendInGroupParams]):
-    name: str = "ListFriendInGroup"
-    description: str = load_desc(Path(__file__).parent / "list_friend_in_group.md", {})
-    params: type[ListFriendInGroupParams] = ListFriendInGroupParams
+class GroupChatFriend(CallableTool2[GroupChatFriendParams]):
+    name: str = "GroupChatFriend"
+    description: str = load_desc(Path(__file__).parent / "list_group_chat_friend.md", {})
+    params: type[GroupChatFriendParams] = GroupChatFriendParams
 
     @override
-    async def __call__(self, params: ListFriendInGroupParams) -> ToolReturnValue:
+    async def __call__(self, params: GroupChatFriendParams) -> ToolReturnValue:
         current_file_dir = os.path.dirname(inspect.getfile(self.__class__))
         friend_base_dir = os.path.join(current_file_dir, '..', '..', '..', 'data', 'friends')
-        ## list 出无 basic.md 且有 bio.md 的人， group_segment.jsonl 取第一个消息拿 group_id
+        ## list 出无 basic.json 且有 bio.md 的人， group_segment.jsonl 取第一个消息拿 group_id
         
         result = []
         for wxid in os.listdir(path=friend_base_dir):
@@ -61,7 +61,7 @@ class ListFriendInGroup(CallableTool2[ListFriendInGroupParams]):
             if '@' in wxid:
                 continue
             friend_dir = os.path.join(friend_base_dir, wxid)
-            basic_path = os.path.join(friend_dir, 'basic.md')
+            basic_path = os.path.join(friend_dir, 'basic.json')
             summary_path = os.path.join(friend_dir, 'summary.md')
             group_segment_path = os.path.join(friend_dir, 'group_segment.jsonl')
             
@@ -72,17 +72,21 @@ class ListFriendInGroup(CallableTool2[ListFriendInGroupParams]):
                 continue
             
             group_id = ''
+            name = ''
             async for obj in parse_multiline_json_objects_async(group_segment_path):
                 if obj.get('messageType') == '80001':
-                    group_id = obj.get('data', {'fromGroup': ''}).get('fromGroup', '')
+                    data = obj.get('data', {})
+                    group_id = data.get('fromGroup', '')
+                    name = data.get('pushContent', ':').split(':')[0].strip()
                     break
                 
             if not group_id:
                 continue
             
             result.append({
-                "group_id": group_id,
-                "personal_summary": await try_load_text(summary_path),
+                "person_in_group_id": group_id,
+                "person_summary": await try_load_text(summary_path),
+                "name": name,
                 "wxid": wxid,
             })
         
@@ -100,7 +104,7 @@ class ListPrivateFriend(CallableTool2[ListPrivateFriendParams]):
     async def __call__(self, params: ListPrivateFriendParams) -> ToolReturnValue:
         current_file_dir = os.path.dirname(inspect.getfile(self.__class__))
         friend_base_dir = os.path.join(current_file_dir, '..', '..', '..', 'data', 'friends')
-        ## list 出有 basic.md 的人
+        ## list 出有 basic.json 的人
         
         result = []
         for wxid in os.listdir(path=friend_base_dir):
@@ -108,19 +112,19 @@ class ListPrivateFriend(CallableTool2[ListPrivateFriendParams]):
             if '@' in wxid:
                 continue
             friend_dir = os.path.join(friend_base_dir, wxid)
-            basic_path = os.path.join(friend_dir, 'basic.md')
-            summary_path = os.path.join(friend_dir, 'summary.md')
+            basic_path = os.path.join(friend_dir, 'basic.json')
             
             if not os.path.exists(basic_path):
                 continue
-            
+
+            summary_path = os.path.join(friend_dir, 'summary.md')
             result.append({
                 "basic_info": await try_load_text(basic_path),
                 "personal_summary": await try_load_text(summary_path),
                 "wxid": wxid,
             })
         
-        return ToolOk(output=str(result), message=f"搜索到了 {len(result)} 个结果")
+        return ToolOk(output=str(result), message=f"搜索到了 {len(result)} 个私聊好友")
 
 
 class ListGroupParams(BaseModel):
@@ -134,14 +138,11 @@ class ListGroup(CallableTool2[ListGroupParams]):
     @override
     async def __call__(self, params: ListGroupParams) -> ToolReturnValue:
         current_file_dir = os.path.dirname(inspect.getfile(self.__class__))
-        group_base_dir = os.path.join(current_file_dir, '..', '..', '..', 'groups')
-        ## list 出有 basic.md 的 group
+        group_base_dir = os.path.join(current_file_dir, '..', '..', '..', 'data', 'groups')
+        ## list 出有 basic.json 的 group
         
         result = []
-        for group_id in os.listdir(path=group_base_dir):
-            # @chatroom or @openim
-            if '@' in group_id:
-                continue
+        for group_id in os.listdir(group_base_dir):
             group_dir = os.path.join(group_base_dir, group_id)
             bio_path = os.path.join(group_dir, 'bio.md')
             
