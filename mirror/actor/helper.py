@@ -19,7 +19,7 @@ def build_toolset():
     toolset += GetCircle()
     toolset += SnsPraise()
     toolset += SnsComment()
-    toolset += SnsSend()
+    # toolset += SnsSend()
 
     # 联系人相关
     toolset += ListGroup()
@@ -38,5 +38,5 @@ def build_toolset():
 
     # 思考，必须
     toolset += Think()
-    toolset += Wait()
+    # toolset += Wait()
     return toolset

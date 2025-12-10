@@ -43,8 +43,8 @@ class Doll:
         self.chat_provider = Kimi(base_url=base_url, api_key=api_key, model=model)
         self.toolset = build_toolset()
 
-        self.format_prompt = (Path(__file__).parent / "format_person.md").read_text(encoding="utf-8")
-
+        self.input_template = (Path(__file__).parent / "agent_input.md").read_text(encoding="utf-8")
+        self.welcome_template = (Path(__file__).parent / "agent_welcome.md").read_text(encoding="utf-8")
         logger.info(f'Awake {__name__}, available tools {str(self.toolset._tool_dict)}')
 
 
@@ -55,21 +55,24 @@ class Doll:
             content=result.return_value.output,
         )
 
+    async def welcome(self, p: Person):
+        # TODO
+        pass
+
     async def agent_loop(self, p: Person):
         history: list[Message] = []
         step = 0
-        max_step_size = 4
+        max_step_size = 5
 
-        system_prompt = '{}\n{}'.format(time_string(), load_desc(Path(__file__).parent / "doll.md", {})) 
+        system_prompt = '{}\n\n{}'.format(time_string(), load_desc(Path(__file__).parent / "doll.md", {})) 
+
+        current = p.memory.private[-1]
 
         if len(p.memory.private) > 1:
-            current = p.memory.private[-1]
             local = p.memory.private[0:-1]
         else:
-            import pdb; pdb.set_trace()
-            current=""
-            local=""
-        content = self.format_prompt.format(current=current, basic=p.basic, bio=p.bio, personality=str(p.analysis_result), local=str(p.memory.private))
+            local=[]
+        content = self.input_template.format(current=current, basic=p.basic, bio=p.bio, personality=str(p.analysis_result), local=str(p.memory.private))
         history.append(Message(role="user", content=content))
 
         while step < max_step_size:
@@ -84,6 +87,7 @@ class Doll:
             await asyncio.sleep(1)
 
             tool_results = await result.tool_results()
+            print(tool_results)
 
             assistant_message = result.message
             tool_messages = [self.tool_result_to_message(tr) for tr in tool_results]

@@ -19,7 +19,7 @@ class Think(CallableTool2[ThinkParams]):
         return ToolOk(output="", message="Thought logged")
 
 class WaitParams(BaseModel):
-    seconds_to_wait: int = Field(description=("Number of seconds to wait, min_value 0 and max_value 20"))
+    seconds_to_wait: int = Field(description=("Number of seconds to wait, min_value 0 and max_value 5"))
 
 class Wait(CallableTool2[WaitParams]):
     name: str = "Wait"
@@ -28,6 +28,6 @@ class Wait(CallableTool2[WaitParams]):
 
     @override
     async def __call__(self, params: WaitParams) -> ToolReturnValue:
-        value = min(20, max(0, params.seconds_to_wait))
+        value = min(5, max(0, params.seconds_to_wait))
         await asyncio.sleep(value)
         return ToolOk(output="", message="Wait finished.")

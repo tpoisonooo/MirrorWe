@@ -21,7 +21,7 @@ class APIMessage:
         }
         data = {'wId': self.cookie.wId, 'wcId': group_id, 'content': image_url}
 
-        json_obj, err = await self.async_post(url='http://{}/sendImage2'.format(
+        json_obj, err = await async_post(url='http://{}/sendImage2'.format(
             self.cookie.WKTEAM_IP_PORT), data=data, headers=headers)
         if err is not None:
             return err
@@ -42,7 +42,7 @@ class APIMessage:
         }
         data = {'wId': self.cookie.wId, 'wcId': group_id, 'imageMd5': md5, 'imgSize': length}
 
-        json_obj, err = await self.async_post(url='http://{}/sendEmoji'.format(
+        json_obj, err = await async_post(url='http://{}/sendEmoji'.format(
             self.cookie.WKTEAM_IP_PORT), data=data, headers=headers)
         if err is not None:
             return err
@@ -63,7 +63,7 @@ class APIMessage:
         }
         data = {'wId': self.cookie.wId, 'wcId': group_id, 'content': text}
 
-        json_obj, err = await self.async_post(url='http://{}/sendText'.format(
+        json_obj, err = await async_post(url='http://{}/sendText'.format(
             self.cookie.WKTEAM_IP_PORT),
                                   data=data,
                                   headers=headers)
@@ -86,7 +86,7 @@ class APIMessage:
         }
         data = {'wId': self.cookie.wId, 'wcId': user_id, 'content': text}
 
-        json_obj, err = await self.async_post(url='http://{}/sendText'.format(
+        json_obj, err = await async_post(url='http://{}/sendText'.format(
             self.cookie.WKTEAM_IP_PORT),
                                   data=data,
                                   headers=headers)
@@ -109,7 +109,7 @@ class APIMessage:
         }
         data = {'wId': self.cookie.wId, 'wcId': group_id, 'description': description, 'title':title, 'thumbUrl':thumb_url, 'url':url}
 
-        json_obj, err = await self.async_post(url='http://{}/sendUrl'.format(
+        json_obj, err = await async_post(url='http://{}/sendUrl'.format(
             self.cookie.WKTEAM_IP_PORT),
                                   data=data,
                                   headers=headers)
@@ -145,7 +145,7 @@ class APIMessage:
                     }
 
                     try: 
-                        _, err = await self.async_post(url='http://{}/revokeMsg'.format(self.cookie.WKTEAM_IP_PORT),
+                        _, err = await async_post(url='http://{}/revokeMsg'.format(self.cookie.WKTEAM_IP_PORT),
                             data=sent,
                             headers=headers)
                     except Exception as e:
@@ -178,7 +178,7 @@ class APIMessage:
 
         try:
             # Get image URL from WKTeam API
-            json_obj, err = await self.async_post('http://{}/getMsgImg'.format(
+            json_obj, err = await async_post('http://{}/getMsgImg'.format(
                 self.cookie.WKTEAM_IP_PORT),
                                      data=data,
                                      headers=headers)
@@ -217,18 +217,20 @@ class APIMessage:
             logger.error(str(e))
             return None, None
 
-    async def async_post(self, url, data, headers):
-        """Async version of post method for API calls."""
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, data=json.dumps(data), headers=headers) as resp:
-                    json_str = await resp.text()
-                    logger.debug((data, json_str))
-                    if resp.status != 200:
-                        return None, Exception('wkteam auth fail {}'.format(json_str))
-                    json_obj = json.loads(json_str)
-                    if json_obj['code'] != '1000':
-                        return json_obj, Exception(json_str)
-                    return json_obj, None
-        except Exception as e:
-            return None, Exception(f'Network error: {str(e)}')
+    # async def async_post(self, url, data, headers):
+    #     """Async version of post method for API calls."""
+
+    #     try:
+    #         async with aiohttp.ClientSession() as session:
+    #             async with session.post(url, data=json.dumps(data), headers=headers) as resp:
+    #                 json_str = await resp.text()
+    #                 logger.debug(json_str)
+
+    #                 if resp.status != 200:
+    #                     return None, Exception('wkteam auth fail {}'.format(json_str))
+    #                 json_obj = json.loads(json_str)
+    #                 if json_obj['code'] != '1000':
+    #                     return json_obj, Exception(json_str)
+    #                 return json_obj, None
+    #     except Exception as e:
+    #         return None, Exception(f'Network error: {str(e)}')

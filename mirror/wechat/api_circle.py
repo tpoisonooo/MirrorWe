@@ -137,13 +137,14 @@ class APICircle:
         每天只能发一次。
         """
 
+        if time.time() - system_start_time < 3 * 24 * 3600:
+            logger.error('Must stay online for 3 days before posting to circle')
+            return {}
+
         success = daily_task_once()
         if not success:
             return {}
-        # if time.time() - system_start_time < 3 * 24 * 3600:
-        #     logger.error('Must stay online for 3 days before posting to circle')
-        #     return {}
-
+       
         headers = {
             'Content-Type': 'application/json',
             'Authorization': self.cookie.auth

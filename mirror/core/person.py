@@ -52,11 +52,14 @@ class Person(ABC):
         self.max_keep = 128
 
     async def update(self):
-        # # 尝试加载本地消息数据
-        # group_file_size = os.path.getsize(self.group_path) if os.path.exists(self.group_path) else 0
-        # # 群里不说话、也不是微信直接好友的（没有 basic），跳过节约时间
-        # if group_file_size < 16*1024 and not os.path.exists(self.basic_path):
-        #     return
+        # 尝试加载本地消息数据
+        group_file_size = os.path.getsize(self.group_path) if os.path.exists(self.group_path) else 0
+        # 群里不说话、也不是微信直接好友的（没有 basic），跳过节约时间
+        if group_file_size < 16*1024 and not os.path.exists(self.basic_path):
+            return
+
+        self.basic = Path(self.basic_path).read_text(encoding="utf-8") if os.path.exists(self.basic_path) else ''
+        self.bio = Path(self.bio_path).read_text(encoding="utf-8") if os.path.exists(self.bio_path) else ''
 
         name = await self.load_local([self.private_path, self.group_path])
 

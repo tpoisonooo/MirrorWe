@@ -10,7 +10,7 @@ import inspect
 import os
 
 class GetContactParams(BaseModel):
-    wc_ids: List[str] = Field(description="微信用户ID列表，最多支持20个ID，用英文逗号分隔")
+    wc_id: List[str] = Field(description="微信用户 ID 或 group_id")
 
 class GetContact(CallableTool2[GetContactParams]):
     name: str = "GetContact"
@@ -21,8 +21,8 @@ class GetContact(CallableTool2[GetContactParams]):
     async def __call__(self, params: GetContactParams) -> ToolReturnValue:
         from mirror.wechat.api_contact import APIContact
         api = APIContact()
-        result = await api.get_contact(params.wc_ids)
-        return ToolOk(output=str(result), message=f"成功获取 {len(params.wc_ids)} 个联系人的信息")
+        result = await api.get_contact([params.wc_id])
+        return ToolOk(output=str(result), message=f"成功获取 params.wc_id 的联系人信息")
 
 class SearchAndAddParams(BaseModel):
     phone: str = Field(default=None, description="手机号码，用于搜索添加好友")

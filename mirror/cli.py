@@ -168,7 +168,7 @@ class WkteamManager:
 
             if '30001' in msg._type:
                 # 4. 自动同意所有好友添加，不再交给 agent 处理
-                await asyncio.sleep(random.uniform(1, 10))
+                await asyncio.sleep(random.uniform(1, 4))
                 await self.api_contact.parse_and_accept(input_json)
                 await sns_praise_first_one(input_json.get('data', {'fromUser':''}).get('fromUser', ''))
                 return web.json_response(text='accept user')
