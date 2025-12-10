@@ -3,7 +3,7 @@ import aiohttp
 import json
 from loguru import logger
 from .cookie import Cookie
-from .helper import async_post
+from .helper import async_post, daily_task_once
 import time
 
 system_start_time = time.time()
@@ -134,11 +134,15 @@ class APICircle:
         """
         发朋友圈 https://wkteam.cn/api-wen-dang2/peng-you-quan/snsSend.html
         ！！！必须保持 3 天在线状态之后，才能发朋友圈！！！
+        每天只能发一次。
         """
 
-        if time.time() - system_start_time < 3 * 24 * 3600:
-            logger.error('Must stay online for 3 days before posting to circle')
+        success = daily_task_once()
+        if not success:
             return {}
+        # if time.time() - system_start_time < 3 * 24 * 3600:
+        #     logger.error('Must stay online for 3 days before posting to circle')
+        #     return {}
 
         headers = {
             'Content-Type': 'application/json',

@@ -6,7 +6,17 @@ import asyncio
 import aiofiles
 from loguru import logger
 from pathlib import Path
+from datetime import datetime, timezone, timedelta
 
+def time_string() -> str:
+    # 创建东八区时区对象
+    tz = timezone(timedelta(hours=8))
+
+    # 现在时间（带时区）
+    now = datetime.now(tz)
+
+    # 格式化输出
+    return now.strftime("当前时间：%Y年%m月%d日 %H时%M分%S秒 %Z")
 
 def load_desc(path: Path, substitutions: dict[str, str] | None = None) -> str:
     """Load a tool description from a file, with optional substitutions."""

@@ -21,10 +21,11 @@ from ..tool.circle import GetCircle, SnsPraise, SnsComment, SnsSend
 from ..tool.contact import ListGroup, ListPrivateFriend, GroupChatFriend, SearchAndAdd, GetContact
 from ..tool.message import RevertAll, SendGroupUrl, SendGroupEmoji, SendGroupText, SendGroupImage, SendUserText
 from ..tool.think import Think
-from ..primitive import load_desc
+from ..primitive import load_desc, time_string
 from ..core import Person
 from typing import List, Dict, Any
 from loguru import logger
+from .helper import build_toolset
 load_dotenv()
 
 class Doll:
@@ -40,39 +41,12 @@ class Doll:
         model = model or "kimi-k2-turbo-preview"
 
         self.chat_provider = Kimi(base_url=base_url, api_key=api_key, model=model)
-        self.toolset = self.build_toolset()
-        self.system_prompt = load_desc(Path(__file__).parent / "doll.md", {})
+        self.toolset = build_toolset()
 
         self.format_prompt = (Path(__file__).parent / "format_person.md").read_text(encoding="utf-8")
 
         logger.info(f'Awake {__name__}, available tools {str(self.toolset._tool_dict)}')
 
-    def build_toolset(self):
-        toolset = SimpleToolset()
-        # 朋友圈相关
-        toolset += GetCircle()
-        toolset += SnsPraise()
-        toolset += SnsComment()
-        toolset += SnsSend()
-
-        # 联系人相关
-        toolset += ListGroup()
-        toolset += ListPrivateFriend()
-        toolset += GroupChatFriend()
-        toolset += SearchAndAdd()
-        toolset += GetContact()
-
-        # 消息相关
-        toolset += RevertAll()
-        # toolset += SendGroupUrl()
-        # toolset += SendGroupEmoji()
-        toolset += SendGroupText()
-        # toolset += SendGroupImage()
-        toolset += SendUserText()
-
-        # 思考，必须
-        toolset += Think()
-        return toolset
 
     def tool_result_to_message(self, result: ToolResult) -> Message:
         return Message(
@@ -84,7 +58,9 @@ class Doll:
     async def agent_loop(self, p: Person):
         history: list[Message] = []
         step = 0
-        max_step_size = 20
+        max_step_size = 8
+
+        system_prompt = '{}\n{}'.format(time_string(), load_desc(Path(__file__).parent / "doll.md", {})) 
 
         content = self.format_prompt.format(basic=p.basic, bio=p.bio, personality=str(p.analysis_result), private=str(p.memory.private))
         history.append(Message(role="user", content=content))
@@ -93,7 +69,7 @@ class Doll:
             step += 1
             result = await kosong.step(
                 chat_provider=self.chat_provider,
-                system_prompt=self.system_prompt,
+                system_prompt=system_prompt,
                 toolset=self.toolset,
                 history=history,
             )

@@ -1,0 +1,1 @@
+Use the tool to wait seconds, doing nothing, just wait.

@@ -23,7 +23,7 @@ import hashlib
 from datetime import datetime
 
 from .db import DB
-from .utils import get_env_or_raise, get_env_with_default
+from .utils import get_env_or_raise, get_env_with_default, time_string
 
 from kosong.chat_provider.kimi import Kimi
 from kosong.message import ContentPart, Message, TextPart, ThinkPart, ToolCall, ToolCallPart
@@ -107,7 +107,7 @@ class LLM:
         self.max_token_size = int(get_env_or_raise('LLM_MAX_TOKEN_SIZE'))
         self.sum_input_token_size = 0
         self.sum_output_token_size = 0
-        self.provider = Kimi(model=get_env_or_raise("KIMI_MODEL"))
+        self.provider = Kimi(model=get_env_or_raise("KIMI_MODEL_NAME"))
 
     @retry(
         stop=stop_after_attempt(3),
@@ -134,8 +134,7 @@ class LLM:
 
         # 如果没 system，给个当前时间戳
         if not system_prompt:
-            time_str = datetime.now().strftime("当前时间：%Y年%m月%d日 %H时%M分%S秒")
-            system_prompt = time_str
+            system_prompt = time_string()
 
         text_part = TextPart(text='')
         async for part in await self.provider.generate(

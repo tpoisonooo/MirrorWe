@@ -38,8 +38,9 @@ class Person(ABC):
 
         self.basic_path = os.path.join(self.wxid_dir, "basic.json")
         self.bio_path = os.path.join(self.wxid_dir, "bio.md")
-        self.basic = Path(self.basic_path).read_text(encoding="utf-8")
-        self.bio = Path(self.bio_path).read_text(encoding="utf-8")
+
+        self.basic = Path(self.basic_path).read_text(encoding="utf-8") if os.path.exists(self.basic_path) else ''
+        self.bio = Path(self.bio_path).read_text(encoding="utf-8") if os.path.exists(self.bio_path) else ''
 
         self.private_path = os.path.join(self.wxid_dir, "message.jsonl")
         self.group_path = os.path.join(self.wxid_dir, "group_segment.jsonl")

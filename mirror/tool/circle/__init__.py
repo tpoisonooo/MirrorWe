@@ -16,8 +16,7 @@ class SnsCommentParams(BaseModel):
     content: str = Field(description="文本评论内容（支持emoji等符号）")
 
 class SnsSendParams(BaseModel):
-    content: str = Field(description="朋友圈内容，要发布的朋友圈文本")
-
+    content: str = Field(description="朋友圈内容，要发布的朋友圈文本。文本建议 30~180 字。")
 
 class GetCircle(CallableTool2[GetCircleParams]):
     name: str = "GetCircle"

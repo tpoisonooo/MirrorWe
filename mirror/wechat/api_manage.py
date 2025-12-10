@@ -16,6 +16,7 @@ class APIManage:
 
     async def login(self):
         """user login, need scan qr code on mobile phone."""
+        raise Exception(f'{__file__} APIManage.login deprecated, please open http://121.229.29.88:6327/#/dashboard and manully login')
         # auth
         headers = {'Content-Type': 'application/json'}
         data = {
@@ -48,11 +49,6 @@ class APIManage:
 
         x = json_obj['data']
         self.cookie.wId = x['wId']
-        self.qrCodeUrl = x['qrCodeUrl']
-
-        logger.info(
-            '浏览器打开这个地址、下载二维码。打开手机，扫描登录微信\n {}\n 请确认 proxy 地区正确，首次使用、24 小时后要再次登录，以后不需要登。'
-            .format(self.qrCodeUrl))
 
         # getLoginInfo
         data={'wId': self.cookie.wId}
@@ -71,7 +67,6 @@ class APIManage:
                 'auth': self.cookie.auth,
                 'wId': self.cookie.wId,
                 'wcId': self.cookie.wcId,
-                'qrCodeUrl': self.qrCodeUrl
             },
             indent=2,
             ensure_ascii=False
