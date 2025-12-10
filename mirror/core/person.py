@@ -29,14 +29,18 @@ class Person(ABC):
         self.memory = MemoryStream()
         self.personality = Personality()
         self.analysis_result = {}  # 存储分析结果
-        self.bio = ""
         
         self.TAG_YOU = "对方"
         self.TAG_ME = "我"
         current_file = inspect.getfile(self.__class__)
         data_dir = os.path.join(os.path.dirname(current_file), "..", "..", "data")
         self.wxid_dir = os.path.join(data_dir, 'friends', self.wxid)
+
         self.basic_path = os.path.join(self.wxid_dir, "basic.json")
+        self.bio_path = os.path.join(self.wxid_dir, "bio.md")
+        self.basic = Path(self.basic_path).read_text(encoding="utf-8")
+        self.bio = Path(self.bio_path).read_text(encoding="utf-8")
+
         self.private_path = os.path.join(self.wxid_dir, "message.jsonl")
         self.group_path = os.path.join(self.wxid_dir, "group_segment.jsonl")
         self.llm = LLM()
@@ -47,11 +51,11 @@ class Person(ABC):
         self.max_keep = 128
 
     async def update(self):
-        # 尝试加载本地消息数据
-        group_file_size = os.path.getsize(self.group_path) if os.path.exists(self.group_path) else 0
-        # 群里不说话、也不是微信直接好友的（没有 basic），跳过节约时间
-        if group_file_size < 16*1024 and not os.path.exists(self.basic_path):
-            return
+        # # 尝试加载本地消息数据
+        # group_file_size = os.path.getsize(self.group_path) if os.path.exists(self.group_path) else 0
+        # # 群里不说话、也不是微信直接好友的（没有 basic），跳过节约时间
+        # if group_file_size < 16*1024 and not os.path.exists(self.basic_path):
+        #     return
 
         name = await self.load_local([self.private_path, self.group_path])
 
@@ -67,16 +71,12 @@ class Person(ABC):
 
     async def brief_bio(self, name:str) -> str:
         """生成朋友的  bio.md 文件，做个 summary.md"""
-        basic = await try_load_text(self.basic_path)
-        bio_path = os.path.join(self.wxid_dir, "bio.md")
-        bio = await try_load_text(bio_path)
-
-        if not basic and not self.memory.private and len(self.memory.group) < 64:
+        if not self.basic and not self.memory.private and len(self.memory.group) < 64:
             return "" # 无法生成画像
         
         # 按 LLM 最大长度，截断百分之多少上下文
         max_text_size = self.llm.max_token_size * 2 * 0.7
-        cur_text_size = len(basic) + len(bio) + len(str(self.memory.private)) + len(str(self.memory.group))
+        cur_text_size = len(self.basic) + len(self.bio) + len(str(self.memory.private)) + len(str(self.memory.group))
         cut_ratio = max_text_size / cur_text_size
         if cut_ratio > 1.0:
             cut_private_index = 0
@@ -90,8 +90,8 @@ class Person(ABC):
 
         prompt = FRIEND_BIO.format(
             name=name,
-            basic=basic,
-            bio=bio,
+            basic=self.basic,
+            bio=self.bio,
             private=json.dumps(private, ensure_ascii=False, indent=2), 
             group=json.dumps(group, ensure_ascii=False, indent=2))
         # 使用新的LLM适配器
@@ -100,7 +100,7 @@ class Person(ABC):
         except Exception as e:
             self.bio = str(e)
 
-        await safe_write_text(bio_path, self.bio)
+        await safe_write_text(self.bio_path, self.bio)
 
         prompt = SUMMARY_BIO.format(bio=self.bio)
         summary = await self.llm.chat_text(prompt=prompt)

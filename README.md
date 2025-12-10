@@ -9,26 +9,23 @@
 
 ## 🚀 快速开始
 
-本项目使用环境变量配置，支持 .env 文件格式：
+本项目使用 .env 配置环境变量：
 
 功能：
 
 - wechat/proxy.py 代理。做 wechat 登录、跨群消息转发、接收消息分类
 - wechat/reorganize.py 处理历史保存的消息。过去的消息也没分类，只存到了单个 .jsonl
 
-## FAQ
-
-- 作者叠甲：我尽量监控，半夜 AI 有啥动作就不知道了。
-- 如何让 AI 干点什么？ 修改 `mirror/core/prompt/me.md`，给ta写个自传
-
 ## 致谢
 - [ncnn contributors](https://github.com/tencent/ncnn) 提供验证环境
-- [HuixiangDou2](https://github.com/tpoisonooo/HuixiangDou2) Retrieval 研究
+- [kosong](https://github.com/MoonshotAI/kosong) 工具调用封装
+- [HuixiangDou2](https://github.com/tpoisonooo/HuixiangDou2) primitive 封装
 - [HuixiangDou](https://github.com/internlm/huixiangdou) 微信接入方法
-- [kosong](https://github.com/MoonshotAI/kosong) 工具调用抽象
 
 ## 开发随感
 - 20251209 做成通用框架，还是纯应用向？以 MirrorDoll 吸引用户，repo 还是通用路线
 - 20251130 观察到微信群复读导致 modeling 出现偏差。例如某人消息里太多“白座”，会认为这个群友是白座。已修复。
 - 20251129 想方便可视化 jsonl@indent=2，又期望高性能用 pyarrow，难兼顾。
 - 20251123 用 coding 的方式动态 modeling 群友。实现后又不知道有啥实际作用。只能先放进 experimental
+
+## [GPL license](./LICENSE)

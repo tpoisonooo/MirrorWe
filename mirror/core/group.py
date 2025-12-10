@@ -45,12 +45,12 @@ class Group(ABC):
         self.min_file_size_kb = 64 * 1024
 
     async def update(self):
-        # 尝试加载本地消息数据
-        group_file_size = os.path.getsize(self.group_path) if os.path.exists(self.group_path) else 0
+        # # 尝试加载本地消息数据
+        # group_file_size = os.path.getsize(self.group_path) if os.path.exists(self.group_path) else 0
 
-        # 没啥消息的空群，跳过
-        if group_file_size < self.min_file_size_kb and not os.path.exists(self.basic_path):
-            return
+        # # 没啥消息的空群，跳过
+        # if group_file_size < self.min_file_size_kb and not os.path.exists(self.basic_path):
+        #     return
 
         await self.load_local([self.group_path])
         if len(self.memory) >= self.threshold:

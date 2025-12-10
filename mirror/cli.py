@@ -57,6 +57,13 @@ class WkteamManager:
         self.api_message = APIMessage()
         self.api_manage = APIManage()
         self.api_contact = APIContact()
+        self.actor = None
+    
+    def setup(self, actor:str=None):
+        match actor:
+            case 'doll':
+                from .actor import Doll
+                self.actor = Doll()
         
     async def bind(self, forward:bool=False, life:int=3600*7*30*12):
         logdir = self.cookie.data_dir
@@ -166,19 +173,26 @@ class WkteamManager:
                 await sns_praise_first_one(input_json.get('data', {'fromUser':''}).get('fromUser', ''))
                 return web.json_response(text='accept user')
 
-            elif '60001' in msg._type:
+            elif '6' in msg._type:
                 # 5. 如果私聊消息，更新发送人记录
-                await Person(wxid=msg.sender_id).update()
+                p = Person(wxid=msg.sender_id)
+                await p.update()
+
+                if self.actor:
+                    await self.actor.agent_loop(p)
 
             elif '80001' in msg._type:
                 # 6. 如果群聊消息，更新发送人和群记录
                 await Person(wxid=msg.sender_id).update()
                 await Group(group_id=msg.group_id).update()
 
-            # 7. 是否需要跨群转发
-            if forward:
+            # 7. 如果是群消息，是否需要跨群转发
+            if msg._type.startswith('8') and forward:
                 await forward_to_groups(msg)
+
             return web.json_response(text='done')
+
+            
 
         # async bind，手动管理生命周期
         app = web.Application()
@@ -305,9 +319,16 @@ async def main():
                         type=int,
                         default=3600*24*30*12,
                         help='Seconds the server survive')
+    
+    parser.add_argument('--actor',
+                        type=str,
+                        default='doll',
+                        help='Actor to response private chat, default: doll')
+
     args = parser.parse_args()
 
     manager = WkteamManager()
+    manager.setup(actor=args.actor)
 
     if args.login:
         await manager.api_manage.login()
