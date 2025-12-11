@@ -19,13 +19,10 @@ class MemoryStream:
 
     def add(self, private:Inner=None, group:Inner=None, moment:Dict[str,Any]=None):
         if private:
-            private['type'] = 'chat'
             self.private.append(private)
         if group:
-            group['type'] = 'group'
             self.group.append(group)
         if moment:
-            moment['type'] = 'moment'
             self.moment.append(moment)
 
     def recent(self, days=7):

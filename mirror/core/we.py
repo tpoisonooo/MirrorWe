@@ -14,7 +14,8 @@ from pathlib import Path
 from .person import Person
 from .group import Group
 from .memory import MemoryStream
-from ..primitive import try_load_text, dump_multi_inner_async, parse_multi_inner_async
+from .inner import Inner, dump_multi_inner_async, parse_multi_inner_async
+from ..primitive import try_load_text
 import weakref
 import atexit
 
@@ -89,7 +90,7 @@ class WeFactory:
         os.makedirs(entity_dir, exist_ok=True)
         return entity_dir
     
-    async def get_person(self, wxid: str, auto_create: bool = True) -> Optional[Person]:
+    async def get_person_async(self, wxid: str, auto_create: bool = True) -> Optional[Person]:
         """
         获取Person对象
         
@@ -106,7 +107,7 @@ class WeFactory:
             person = person_ref()
             if person is not None:
                 self._cache_stats['person_hits'] += 1
-                logger.debug(f"Person 缓存命中: {wxid}")
+                # logger.debug(f"Person 缓存命中: {wxid}")
                 return person
             else:
                 # 对象已被垃圾回收，从缓存中移除
@@ -121,18 +122,19 @@ class WeFactory:
         # 创建新的Person对象
         if auto_create:
             person = Person(wxid)
+            await person.initialize()
             # 确保目录存在
             self._ensure_entity_directory(wxid, 'friends')
             
             # 添加到缓存
             self._person_cache[wxid] = weakref.ref(person, self._on_person_finalized)
             
-            logger.info(f"创建新的Person对象: {wxid}")
+            # logger.info(f"创建新的Person对象: {wxid}")
             return person
         
         return None
     
-    async def get_group(self, group_id: str, auto_create: bool = True) -> Optional[Group]:
+    async def get_group_async(self, group_id: str, auto_create: bool = True) -> Optional[Group]:
         """
         获取Group对象
         
@@ -154,7 +156,7 @@ class WeFactory:
             group = group_ref()
             if group is not None:
                 self._cache_stats['group_hits'] += 1
-                logger.debug(f"Group 缓存命中: {group_id}")
+                # logger.debug(f"Group 缓存命中: {group_id}")
                 return group
             else:
                 # 对象已被垃圾回收，从缓存中移除
@@ -169,6 +171,7 @@ class WeFactory:
         # 创建新的Group对象
         if auto_create:
             group = Group(group_id)
+            await group.initialize()
             # 确保目录存在
             self._ensure_entity_directory(group_id, 'groups')
             
@@ -225,7 +228,7 @@ class WeFactory:
             wxid, ref = next(iter(self._person_cache.items()))
             del self._person_cache[wxid]
             self._cache_stats['evictions'] += 1
-            logger.info(f"清理Person缓存: {wxid}")
+            # logger.info(f"清理Person缓存: {wxid}")
     
     async def _evict_oldest_group(self):
         """清理最老的Group对象"""
@@ -301,7 +304,7 @@ class WeFactory:
 _factory_instance: Optional[WeFactory] = None
 
 
-def get_factory(max_cache_size: int = 100) -> WeFactory:
+def get_factory(max_cache_size: int = 32) -> WeFactory:
     """
     获取全局工厂实例（单例模式）
     

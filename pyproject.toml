@@ -41,6 +41,7 @@ dependencies = [
     "tenacity>=8.0.0",
     "kosong>=0.31.0",
     "anyio>=4.11.0",
+    "dataclasses-json>=0.6.7",
 ]
 
 [[tool.uv.index]]

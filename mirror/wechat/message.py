@@ -33,7 +33,7 @@ class Message:
 
     def parse(self, wx_msg: dict, bot_wxid: str, auth:str='', wkteam_ip_port:str=''):
         # str or int
-        _type = wx_msg['messageType']
+        _type = wx_msg.get('messageType', '')
         parse_type = 'unknown'
         data = wx_msg.get('data', {})
         if not data or type(data) is not dict:
@@ -91,7 +91,7 @@ class Message:
             self.desc = desc
             self.thumb_url = search_key(xml_key='thumburl')
             
-            query = data['pushContent']
+            query = data.get('pushContent', '')
 
         elif _type in ['80006']:
             parse_type = 'emoji'

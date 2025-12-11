@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import List, Dict, Any
 from loguru import logger
 from ..prompt import GROUP_BIO, SUMMARY_BIO
-from .inner import convert_json_to_inner, Inner, parse_multi_inner_async, dump_multi_inner_async
+from .inner import convert_to_inner, Inner, parse_multi_inner_async, dump_multi_inner_sync
 from ..primitive import try_load_text, safe_write_text
 from ..primitive import LLM
 from datetime import datetime
@@ -53,16 +53,12 @@ class Group(ABC):
 
     async def initialize(self):
         # 加载数据
-        async for inner in parse_multi_inner_async(self.private_path):
-            self.memory.add(private=inner)
         async for inner in parse_multi_inner_async(self.group_path):
             self.memory.add(group=inner)
         # 消息加载偏移
         self.offset = len(self.memory.group)
         
-        # 对方名字
-        self.name = self.memory.private[0].sender_name if self.memory.private else self.memory.group[0].sender_name
-        
+        # 加载基本信息
         self.basic = await try_load_text(self.basic_path)
         self.bio = await try_load_text(self.bio_path)
         # 扔个空消息，触发分析
@@ -74,24 +70,19 @@ class Group(ABC):
         if me is None:   
             logger.info('Group 对象已被销毁，跳过保存消息偏移')           
             return
-
-        async def _dump(me):
-            """将当前内存中的消息追加到文件末尾，析构时调用"""
-            group_offset = me.offset
-            if len(me.memory.group) > group_offset:
-                await dump_multi_inner_async(
-                    me.group_path, me.memory.group[group_offset:], mode='append')
         
-        loop = always_get_an_event_loop()
         logger.info(f'Group {me.group_id}: 正在保存消息偏移...')
-        loop.run_until_complete(_dump(me))
+        group_offset = me.offset
+        if len(me.memory.group) > group_offset:
+            dump_multi_inner_sync(
+                me.group_path, me.memory.group[group_offset:], mode='append')
         logger.info(f'Group {me.group_id}: 完成保存消息偏移')
 
     async def update(self, wk_msg: Message):
         """更新消息数据，触发个性分析"""
         if wk_msg:
             # 如果是群聊消息，加 group
-            inner = convert_json_to_inner(wk_msg) 
+            inner = convert_to_inner(wk_msg) 
             if hasattr(wk_msg, '_type') and str(wk_msg._type) in ['80001', '80001']:
                 self.memory.add(group=inner)
 
@@ -120,10 +111,11 @@ class Group(ABC):
             cut_group_index = max(0, int(cut_ratio * len(self.memory.group)))
 
         group = self.memory.group[-cut_group_index:]
+        group_json_str = Inner.schema().dumps(group, many=True, ensure_ascii=False)
         prompt = GROUP_BIO.format(
             basic=basic,
             bio=bio,
-            group=json.dumps(group, ensure_ascii=False, indent=2))
+            group=group_json_str)
         # 使用新的LLM适配器
         try:
             self.bio = await self.llm.chat_text(prompt)

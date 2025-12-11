@@ -9,14 +9,16 @@ import sys
 import inspect
 import aiofiles
 import weakref
+import atexit
+import datetime
 
 from pathlib import Path
 from typing import List, Dict, Any
 from loguru import logger
 from ..prompt import FRIEND_BIO, SUMMARY_BIO
-from .inner import convert_json_to_inner, Inner, parse_multi_inner_async, dump_multi_inner_async
+from .inner import convert_wkteam_to_inner, Inner, parse_multi_inner_async, dump_multi_inner_sync
 from ..primitive import safe_write_text, try_load_text
-from ..primitive import LLM
+from ..primitive import LLM, always_get_an_event_loop
 from ..wechat.message import Message
 from datetime import datetime
 
@@ -47,7 +49,6 @@ class Person(ABC):
         self.group_path = os.path.join(self.wxid_dir, "group_segment.jsonl")
         self.llm = LLM()
 
-        self.name = '对方昵称或备注，初始化时将从消息记录提取'
         # 加载消息的 offset，销毁时要用 offset 把消息追加下去
         self.offset = (0, 0)
         
@@ -60,6 +61,14 @@ class Person(ABC):
         self._wr = weakref.ref(self)
         atexit.register(self._atexit_dump)
 
+    def get_name(self):
+        name = '对方昵称或备注，初始化时将从消息记录提取'
+        if self.memory.private:
+            name = self.memory.private[0].sender_name 
+        elif self.memory.group:
+            name = self.memory.group[0].sender_name
+        return name
+
     async def initialize(self):
         # 加载数据
         async for inner in parse_multi_inner_async(self.private_path):
@@ -69,9 +78,7 @@ class Person(ABC):
         # 消息加载偏移
         self.offset = (len(self.memory.private), len(self.memory.group))
         
-        # 对方名字
-        self.name = self.memory.private[0].sender_name if self.memory.private else self.memory.group[0].sender_name
-        
+        # 加载基本信息
         self.basic = await try_load_text(self.basic_path)
         self.bio = await try_load_text(self.bio_path)
         # 扔个空消息，触发分析
@@ -84,19 +91,15 @@ class Person(ABC):
             logger.info('Person 对象已被销毁，跳过保存消息偏移')           
             return
 
-        async def _dump(me):
-            """将当前内存中的消息追加到文件末尾，析构时调用"""
-            private_offset, group_offset = me.offset
-            if len(me.memory.private) > private_offset:
-                await dump_multi_inner_async(
-                    me.private_path, me.memory.private[private_offset:], mode='append')
-            if len(me.memory.group) > group_offset:
-                await dump_multi_inner_async(
-                    me.group_path, me.memory.group[group_offset:], mode='append')
+        logger.info(f'Person {me.wxid}: 正在保存消息偏移... {me.offset} -> {len(me.memory.private)}, {len(me.memory.group)}')
+        private_offset, group_offset = me.offset
         
-        loop = always_get_an_event_loop()
-        logger.info(f'Person {me.wxid}: 正在保存消息偏移...')
-        loop.run_until_complete(_dump(me))
+        if len(me.memory.private) > private_offset:
+            dump_multi_inner_sync(
+                me.private_path, me.memory.private[private_offset:], mode='append')
+        if len(me.memory.group) > group_offset:
+            dump_multi_inner_sync(
+                me.group_path, me.memory.group[group_offset:], mode='append')
         logger.info(f'Person {me.wxid}: 完成保存消息偏移')
 
     async def update(self, wk_msg: Message):
@@ -108,11 +111,13 @@ class Person(ABC):
                 case '60001' | 60001:
                     self.memory.add(private=inner)
                 case '80001' | 80001:
+                    if wk_msg.is_self:
+                        return  # 跳过自己的群消息（可能是自己的 forward 消息）
                     self.memory.add(group=inner)
 
         if len(self.memory) >= self.threshold:
             # 触发更新
-            await self.brief_bio(name=name)
+            await self.brief_bio(name=self.get_name())
             await self._analyze_personality()
             await self._setup_personality_from_analysis()
 
@@ -131,7 +136,7 @@ class Person(ABC):
         # 按 LLM 最大长度，截断百分之多少上下文
         max_text_size = self.llm.max_token_size * 2 * 0.7
         cur_text_size = len(self.basic) + len(self.bio) + len(str(self.memory.private)) + len(str(self.memory.group))
-        cut_ratio = max_text_size / cur_text_size
+        cut_ratio = max_text_size / max(1, cur_text_size)
         if cut_ratio > 1.0:
             cut_private_index = 0
             cut_group_index = 0
@@ -140,14 +145,17 @@ class Person(ABC):
             cut_group_index = max(0, int(cut_ratio * len(self.memory.group)))
 
         private = self.memory.private[-cut_private_index:]
+        private_json_str = Inner.schema().dumps(private, many=True, ensure_ascii=False)
+
         group = self.memory.group[-cut_group_index:]
+        group_json_str = Inner.schema().dumps(group, many=True, ensure_ascii=False)
 
         prompt = FRIEND_BIO.format(
             name=name,
             basic=self.basic,
             bio=self.bio,
-            private=json.dumps(private, ensure_ascii=False, indent=2), 
-            group=json.dumps(group, ensure_ascii=False, indent=2))
+            private=private_json_str, 
+            group=group_json_str)
         # 使用新的LLM适配器
         try:
             self.bio = await self.llm.chat_text(prompt)
@@ -161,37 +169,6 @@ class Person(ABC):
         summary_path = os.path.join(self.wxid_dir, 'summary.md')
         await safe_write_text(summary_path, summary)
 
-    async def load_local(self, message_files: List[str]):
-        """加载 message.jsonl 和 group_segment.jsonl 文件"""
-
-        name = '某位好友'
-        try:
-            total_loaded = 0
-            # 解析多行JSON格式
-            for messages_file in message_files:
-                if not os.path.exists(messages_file):
-                    continue
-                
-                file_loaded = 0
-                async for inner in parse_multi_inner_async(messages_file):
-
-                    match inner.type:
-                        case '':
-                            self.memory.add(private=inner)
-                        case '80001' | 80001:
-                            self.memory.add(group=inner)
-                
-                total_loaded += file_loaded
-                logger.info(f"从 {messages_file} 加载了 {file_loaded} 条有效消息")
-
-            logger.info(f"总共加载了 {total_loaded} 条有效消息")
-            
-        except Exception as e:
-            logger.error(f"加载本地消息数据失败: {e}")
-            import traceback
-            traceback.print_exc()
-        return name
-    
     async def _analyze_personality(self):
         """基于消息数据进行个性分析"""
         # 从 memory 中获取消息数据
@@ -278,7 +255,6 @@ class Person(ABC):
     
     async def _analyze_time_pattern(self, timestamps: List[int]) -> str:
         """分析时间模式"""
-        import datetime
         
         if not timestamps:
             return "unknown"
