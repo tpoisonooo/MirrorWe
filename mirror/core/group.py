@@ -8,6 +8,8 @@ import os
 import sys
 import inspect
 import aiofiles
+import weakref
+import atexit
 from pathlib import Path
 from typing import List, Dict, Any
 from loguru import logger
@@ -20,6 +22,7 @@ from ..wechat.message import Message
 
 # 添加项目路径
 from mirror.core.memory import MemoryStream
+from mirror.primitive import always_get_an_event_loop
 
 # TODO
 class Group(ABC):
@@ -37,6 +40,7 @@ class Group(ABC):
         self.group_path = os.path.join(self.group_dir, "message.jsonl")
         self.offset = 0
         self.llm = LLM()
+        self.bio_path = os.path.join(self.group_dir, "bio.md")
 
         # 群聊累计达到 threshold 条消息，就只保留末尾 max_keep 条有效的
         # 同时开始更新 bio
@@ -62,7 +66,7 @@ class Group(ABC):
         self.basic = await try_load_text(self.basic_path)
         self.bio = await try_load_text(self.bio_path)
         # 扔个空消息，触发分析
-        await self.update()
+        await self.update(wk_msg=None)
 
     def _atexit_dump(self):
         me = self._wr()
@@ -83,21 +87,20 @@ class Group(ABC):
         loop.run_until_complete(_dump(me))
         logger.info(f'Group {me.group_id}: 完成保存消息偏移')
 
-    async def update(self, msg: Message):
+    async def update(self, wk_msg: Message):
         """更新消息数据，触发个性分析"""
         if wk_msg:
-            # 如果是私聊消息，加 private，否则加 group
-            inner = convert_wkteam_to_inner(wk_msg) 
-            match wk_msg._type:
-                case '80001' | 80001:
-                    self.memory.add(group=inner)
+            # 如果是群聊消息，加 group
+            inner = convert_json_to_inner(wk_msg) 
+            if hasattr(wk_msg, '_type') and str(wk_msg._type) in ['80001', '80001']:
+                self.memory.add(group=inner)
 
         if len(self.memory) >= self.threshold:
             await self.brief_bio()
             self.memory.group = self.memory.group[-self.max_keep:]
             self.offset = 0
             logger.info(f"Group {self.group_id}: 当前 {len(self.memory.group)} 条群聊消息，完成个性分析")
-            
+
     async def brief_bio(self) -> str:
         """生成群的  bio.md 文件"""
         basic = await try_load_text(self.basic_path)

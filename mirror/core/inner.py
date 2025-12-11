@@ -78,7 +78,7 @@ async def dump_multi_inner_async(file_path: str, objs: List[Inner], mode='write'
         raise
 
 
-async def parse_multi_inner_async(file_path: str) -> AsyncGenerator[Inner, None]:
+async def parse_multi_inner_async(file_path: str, convert: callable=convert_json_to_inner) -> AsyncGenerator[Any, None]:
     """
     异步解析多行JSON文件，逐对象输出
     
@@ -136,6 +136,8 @@ async def parse_multi_inner_async(file_path: str) -> AsyncGenerator[Inner, None]
                         # 找到一个完整的JSON对象
                         try:
                             obj = json.loads(current_obj)
+                            if convert:
+                                obj = convert(obj)
                             obj_count += 1
                             yield obj
                             
@@ -158,9 +160,10 @@ async def parse_multi_inner_async(file_path: str) -> AsyncGenerator[Inner, None]
         if current_obj.strip() and brace_count == 0:
             try:
                 obj = json.loads(current_obj)
-                inner = convert_json_to_inner(obj)
+                if convert:
+                    obj = convert(obj)
                 obj_count += 1
-                yield inner
+                yield obj
             except json.JSONDecodeError as e:
                 error_count += 1
                 logger.warning(f"最后一个 Inner 对象解析失败: {str(e)}")

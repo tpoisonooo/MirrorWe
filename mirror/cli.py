@@ -37,7 +37,7 @@ from .wechat.cookie import Cookie
 from .wechat.message import Message, get_message_log_paths, save_message_to_file
 
 from .wechat import APIContact, APICircle, APIMessage, APIManage
-from .core import Person, Group
+from .core.we import get_factory
 from .primitive import LLM, get_env_or_raise, always_get_an_event_loop
 from .prompt import SUMMARY_BIO
 
@@ -58,6 +58,7 @@ class WkteamManager:
         self.api_manage = APIManage()
         self.api_contact = APIContact()
         self.actor = None
+        self.factory = get_factory()
     
     def setup(self, actor:str=None):
         match actor:
@@ -153,9 +154,6 @@ class WkteamManager:
                 logger.warning(text)
                 return web.json_response(text=text)
 
-            # 分类保存
-            specific_logpaths = get_message_log_paths(logdir=logdir, message_type=msg._type, sender_id=msg.sender_id, group_id=msg.group_id)
-            await save_message_to_file(specific_logpaths, input_json)
 
             # 3. 是否需要撤回
             if msg.need_revert():
@@ -175,16 +173,16 @@ class WkteamManager:
 
             elif '6' in msg._type:
                 # 5. 如果私聊消息，更新发送人记录
-                p = Person(wxid=msg.sender_id)
-                await p.update()
+                p = await self.factory.get_person_async(wxid=msg.sender_id)
+                await p.update(wk_msg=msg)
 
                 if self.actor:
                     await self.actor.agent_loop(p)
 
             elif '80001' in msg._type:
                 # 6. 如果群聊消息，更新发送人和群记录
-                await Person(wxid=msg.sender_id).update()
-                await Group(group_id=msg.group_id).update()
+                await (await self.factory.get_person_async(wxid=msg.sender_id)).update(wk_msg=msg)
+                await (await self.factory.get_group_async(group_id=msg.group_id)).update(wk_msg=msg)
 
             # 7. 如果是群消息，是否需要跨群转发
             if msg._type.startswith('8') and forward:
@@ -284,11 +282,13 @@ async def init_friends_groups_basic():
     
     logger.info(f"Initializing profiles for {len(person_list)} people...")
     
+    factory = get_factory()
+
     for wxid in tqdm(person_list):
         logger.debug(f"Initializing profile for {wxid}")
-        p = Person(wxid=wxid)
-        await p.update()
-            
+        p = await factory.get_person_async(wxid=wxid)
+        await p.update(wk_msg=None)
+
     logger.info("Profile initialization completed")
     
 

@@ -75,7 +75,7 @@ class Person(ABC):
         self.basic = await try_load_text(self.basic_path)
         self.bio = await try_load_text(self.bio_path)
         # 扔个空消息，触发分析
-        await self.update()
+        await self.update(wk_msg=None)
 
     def _atexit_dump(self):
         me = self._wr()
@@ -99,7 +99,7 @@ class Person(ABC):
         loop.run_until_complete(_dump(me))
         logger.info(f'Person {me.wxid}: 完成保存消息偏移')
 
-    async def update(self, wk_msg: Message=None):
+    async def update(self, wk_msg: Message):
         """更新消息数据，触发个性分析"""
         if wk_msg:
             # 如果是私聊消息，加 private，否则加 group
@@ -115,7 +115,7 @@ class Person(ABC):
             await self.brief_bio(name=name)
             await self._analyze_personality()
             await self._setup_personality_from_analysis()
-            
+
             # 截断消息
             self.memory.private = self.memory.private[-self.max_keep:]
             self.memory.group = self.memory.group[-self.max_keep:]
