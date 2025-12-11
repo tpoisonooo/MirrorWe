@@ -125,12 +125,13 @@ class Message:
         self._type = _type
         self.is_self = data.get('self', False)
         self.sender_id = data.get('toUser' if self.is_self else 'fromUser', '')
-        self.data = data
         self.new_msg_id = data.get('newMsgId', '')
         self.type = parse_type
         self.group_id = data.get('fromGroup', '')
         self.push_content = data.get('pushContent', '')
         self.content = content
+        self.ts = data.get('timestamp', 0)
+        self.data = data
         return None
 
     def need_revert(self) -> bool:

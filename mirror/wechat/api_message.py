@@ -6,10 +6,11 @@ import hashlib
 from loguru import logger
 from .cookie import Cookie
 from .helper import async_post
+from ..primitive.metaclass import SingletonMeta
 import time
 import aiofiles
 
-class APIMessage:
+class APIMessage(metaclass=SingletonMeta):
     def __init__(self):
         self.cookie = Cookie()
         self.sent_msg = {}

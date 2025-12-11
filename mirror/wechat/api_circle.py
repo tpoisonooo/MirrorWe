@@ -4,12 +4,13 @@ import json
 from loguru import logger
 from .cookie import Cookie
 from .helper import async_post, daily_task_once
+from ..primitive.metaclass import SingletonMeta
 import time
 
-system_start_time = time.time()
-
-class APICircle:
+class APICircle(metaclass=SingletonMeta):
     def __init__(self):
+        # 朋友圈是高危工作，记录启动时间
+        self.system_start_time = time.time()
         self.cookie = Cookie()
 
     async def get_circle(self, wxid:str) -> Dict[str, Any]:

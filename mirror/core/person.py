@@ -8,13 +8,16 @@ import os
 import sys
 import inspect
 import aiofiles
+import weakref
+
 from pathlib import Path
 from typing import List, Dict, Any
 from loguru import logger
 from ..prompt import FRIEND_BIO, SUMMARY_BIO
-from ..primitive import parse_multiline_json_objects_async, dump_multiline_json_objects_async
+from .inner import convert_json_to_inner, Inner, parse_multi_inner_async, dump_multi_inner_async
 from ..primitive import safe_write_text, try_load_text
 from ..primitive import LLM
+from ..wechat.message import Message
 from datetime import datetime
 
 # 添加项目路径
@@ -30,7 +33,6 @@ class Person(ABC):
         self.personality = Personality()
         self.analysis_result = {}  # 存储分析结果
         
-        self.TAG_YOU = "对方"
         self.TAG_ME = "我"
         current_file = inspect.getfile(self.__class__)
         data_dir = os.path.join(os.path.dirname(current_file), "..", "..", "data")
@@ -38,40 +40,88 @@ class Person(ABC):
 
         self.basic_path = os.path.join(self.wxid_dir, "basic.json")
         self.bio_path = os.path.join(self.wxid_dir, "bio.md")
-
-        self.basic = Path(self.basic_path).read_text(encoding="utf-8") if os.path.exists(self.basic_path) else ''
-        self.bio = Path(self.bio_path).read_text(encoding="utf-8") if os.path.exists(self.bio_path) else ''
+        self.basic = ''
+        self.bio = ''
 
         self.private_path = os.path.join(self.wxid_dir, "message.jsonl")
         self.group_path = os.path.join(self.wxid_dir, "group_segment.jsonl")
         self.llm = LLM()
+
+        self.name = '对方昵称或备注，初始化时将从消息记录提取'
+        # 加载消息的 offset，销毁时要用 offset 把消息追加下去
+        self.offset = (0, 0)
         
         # 群聊、私聊累计达到 threshold 条消息，就只保留末尾 max_keep 条有效的
         # 同时开始更新 bio
         self.threshold = 512  # AKA 多少条消息，足以刻画这个人
         self.max_keep = 128
 
-    async def update(self):
-        # 尝试加载本地消息数据
-        group_file_size = os.path.getsize(self.group_path) if os.path.exists(self.group_path) else 0
-        # 群里不说话、也不是微信直接好友的（没有 basic），跳过节约时间
-        if group_file_size < 16*1024 and not os.path.exists(self.basic_path):
+        # 销毁遗言，保留数据
+        self._wr = weakref.ref(self)
+        atexit.register(self._atexit_dump)
+
+    async def initialize(self):
+        # 加载数据
+        async for inner in parse_multi_inner_async(self.private_path):
+            self.memory.add(private=inner)
+        async for inner in parse_multi_inner_async(self.group_path):
+            self.memory.add(group=inner)
+        # 消息加载偏移
+        self.offset = (len(self.memory.private), len(self.memory.group))
+        
+        # 对方名字
+        self.name = self.memory.private[0].sender_name if self.memory.private else self.memory.group[0].sender_name
+        
+        self.basic = await try_load_text(self.basic_path)
+        self.bio = await try_load_text(self.bio_path)
+        # 扔个空消息，触发分析
+        await self.update()
+
+    def _atexit_dump(self):
+        me = self._wr()
+        
+        if me is None:   
+            logger.info('Person 对象已被销毁，跳过保存消息偏移')           
             return
 
-        self.basic = Path(self.basic_path).read_text(encoding="utf-8") if os.path.exists(self.basic_path) else ''
-        self.bio = Path(self.bio_path).read_text(encoding="utf-8") if os.path.exists(self.bio_path) else ''
+        async def _dump(me):
+            """将当前内存中的消息追加到文件末尾，析构时调用"""
+            private_offset, group_offset = me.offset
+            if len(me.memory.private) > private_offset:
+                await dump_multi_inner_async(
+                    me.private_path, me.memory.private[private_offset:], mode='append')
+            if len(me.memory.group) > group_offset:
+                await dump_multi_inner_async(
+                    me.group_path, me.memory.group[group_offset:], mode='append')
+        
+        loop = always_get_an_event_loop()
+        logger.info(f'Person {me.wxid}: 正在保存消息偏移...')
+        loop.run_until_complete(_dump(me))
+        logger.info(f'Person {me.wxid}: 完成保存消息偏移')
 
-        name = await self.load_local([self.private_path, self.group_path])
+    async def update(self, wk_msg: Message=None):
+        """更新消息数据，触发个性分析"""
+        if wk_msg:
+            # 如果是私聊消息，加 private，否则加 group
+            inner = convert_wkteam_to_inner(wk_msg) 
+            match wk_msg._type:
+                case '60001' | 60001:
+                    self.memory.add(private=inner)
+                case '80001' | 80001:
+                    self.memory.add(group=inner)
 
         if len(self.memory) >= self.threshold:
             # 触发更新
             await self.brief_bio(name=name)
-            await dump_multiline_json_objects_async(self.group_path, self.memory.group[-self.max_keep:])
-            await dump_multiline_json_objects_async(self.private_path, self.memory.private[-self.max_keep:])
+            await self._analyze_personality()
+            await self._setup_personality_from_analysis()
+            
+            # 截断消息
+            self.memory.private = self.memory.private[-self.max_keep:]
+            self.memory.group = self.memory.group[-self.max_keep:]
+            self.offset = (0, 0)
 
-        await self._analyze_personality()
-        await self._setup_personality_from_analysis()
-        logger.info(f"Person {self.wxid}: 加载了 {len(self.memory)} 条消息，完成个性分析")
+            logger.info(f"Person {self.wxid}: 当前 {len(self.memory.private)} 条私聊消息+ {len(self.memory.group)} 条群聊消息，完成个性分析")
 
     async def brief_bio(self, name:str) -> str:
         """生成朋友的  bio.md 文件，做个 summary.md"""
@@ -123,26 +173,13 @@ class Person(ABC):
                     continue
                 
                 file_loaded = 0
-                async for obj in parse_multiline_json_objects_async(messages_file):
-                    data = obj.get('data', {})
-                    is_self = data.get('self', False)
-                    content = data.get('content', '').strip()
-                    name = data.get('pushContent', ':').split(':')[0].strip()
-                    ts = data.get('timestamp', 0)
+                async for inner in parse_multi_inner_async(messages_file):
 
-                    if obj.get('messageType') == '60001':
-                        # dt = datetime.fromtimestamp(ts)
-                        # formatted = dt.strftime('%Y%m%d %H%M%S')
-                        if is_self:
-                            message = {"content":f"{self.TAG_ME}:{content}", "ts":ts}
-                        else:
-                            message = {"content":f"{name}:{content}", "ts":ts}
-                        self.memory.add(private=message)
-                        file_loaded += 1
-                    elif obj.get('messageType') == '80001':
-                        message = {"content":f"{name}:{content}", "ts":ts}
-                        self.memory.add(group=message)
-                        file_loaded += 1
+                    match inner.type:
+                        case '':
+                            self.memory.add(private=inner)
+                        case '80001' | 80001:
+                            self.memory.add(group=inner)
                 
                 total_loaded += file_loaded
                 logger.info(f"从 {messages_file} 加载了 {file_loaded} 条有效消息")

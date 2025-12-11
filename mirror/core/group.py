@@ -12,10 +12,11 @@ from pathlib import Path
 from typing import List, Dict, Any
 from loguru import logger
 from ..prompt import GROUP_BIO, SUMMARY_BIO
-from ..primitive import parse_multiline_json_objects_async, dump_multiline_json_objects_async
+from .inner import convert_json_to_inner, Inner, parse_multi_inner_async, dump_multi_inner_async
 from ..primitive import try_load_text, safe_write_text
 from ..primitive import LLM
 from datetime import datetime
+from ..wechat.message import Message
 
 # 添加项目路径
 from mirror.core.memory import MemoryStream
@@ -34,6 +35,7 @@ class Group(ABC):
         self.group_dir = os.path.join(data_dir, 'groups', self.group_id)
         self.basic_path = os.path.join(self.group_dir, "basic.json")
         self.group_path = os.path.join(self.group_dir, "message.jsonl")
+        self.offset = 0
         self.llm = LLM()
 
         # 群聊累计达到 threshold 条消息，就只保留末尾 max_keep 条有效的
@@ -41,22 +43,61 @@ class Group(ABC):
         self.threshold = 4096
         self.max_keep = 1024
 
-        # 文件最小值
-        self.min_file_size_kb = 64 * 1024
+        # 销毁遗言，保留数据
+        self._wr = weakref.ref(self)
+        atexit.register(self._atexit_dump)
 
-    async def update(self):
-        # 尝试加载本地消息数据
-        group_file_size = os.path.getsize(self.group_path) if os.path.exists(self.group_path) else 0
+    async def initialize(self):
+        # 加载数据
+        async for inner in parse_multi_inner_async(self.private_path):
+            self.memory.add(private=inner)
+        async for inner in parse_multi_inner_async(self.group_path):
+            self.memory.add(group=inner)
+        # 消息加载偏移
+        self.offset = len(self.memory.group)
+        
+        # 对方名字
+        self.name = self.memory.private[0].sender_name if self.memory.private else self.memory.group[0].sender_name
+        
+        self.basic = await try_load_text(self.basic_path)
+        self.bio = await try_load_text(self.bio_path)
+        # 扔个空消息，触发分析
+        await self.update()
 
-        # 没啥消息的空群，跳过
-        if group_file_size < self.min_file_size_kb and not os.path.exists(self.basic_path):
+    def _atexit_dump(self):
+        me = self._wr()
+        
+        if me is None:   
+            logger.info('Group 对象已被销毁，跳过保存消息偏移')           
             return
 
-        await self.load_local([self.group_path])
+        async def _dump(me):
+            """将当前内存中的消息追加到文件末尾，析构时调用"""
+            group_offset = me.offset
+            if len(me.memory.group) > group_offset:
+                await dump_multi_inner_async(
+                    me.group_path, me.memory.group[group_offset:], mode='append')
+        
+        loop = always_get_an_event_loop()
+        logger.info(f'Group {me.group_id}: 正在保存消息偏移...')
+        loop.run_until_complete(_dump(me))
+        logger.info(f'Group {me.group_id}: 完成保存消息偏移')
+
+    async def update(self, msg: Message):
+        """更新消息数据，触发个性分析"""
+        if wk_msg:
+            # 如果是私聊消息，加 private，否则加 group
+            inner = convert_wkteam_to_inner(wk_msg) 
+            match wk_msg._type:
+                case '80001' | 80001:
+                    self.memory.add(group=inner)
+
         if len(self.memory) >= self.threshold:
             await self.brief_bio()
-            await dump_multiline_json_objects_async(self.group_path, self.memory.group[-self.max_keep:])
-
+            self.memory.group = self.memory.group[-self.max_keep:]
+            self.offset = 0
+            logger.info(f"Group {self.group_id}: 当前 {len(self.memory.group)} 条群聊消息，完成个性分析")
+            
     async def brief_bio(self) -> str:
         """生成群的  bio.md 文件"""
         basic = await try_load_text(self.basic_path)

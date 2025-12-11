@@ -1,11 +1,12 @@
 from datetime import datetime
 from typing import List, Dict, Optional, Any
+from .inner import Inner
 
 class MemoryStream:
     def __init__(self):
-        self.private: List[Dict] = []
-        self.group: List[Dict] = []
-        self.moment: List[Dict] = []
+        self.private: List[Inner] = []
+        self.group: List[Inner] = []
+        self.moment: List[Dict[str, Any]] = []
 
     def __len__(self):
         return len(self.private) + len(self.group) + len(self.moment)
@@ -16,7 +17,7 @@ class MemoryStream:
     def __iter__(self):
         return iter(self.private + self.group + self.moment)
 
-    def add(self, private:Dict[str,Any]=None, group:Dict[str,Any]=None, moment:Dict[str,Any]=None):
+    def add(self, private:Inner=None, group:Inner=None, moment:Dict[str,Any]=None):
         if private:
             private['type'] = 'chat'
             self.private.append(private)
