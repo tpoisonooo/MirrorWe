@@ -92,11 +92,21 @@ class Person(ABC):
         logger.info(f'Person {me.wxid}: 正在保存 {len(me.memory.private)} 私聊消息, {len(me.memory.group)} 群聊消息')
         private_offset, group_offset = me.offset
         
-        dump_multi_inner_sync(
-            me.private_path, me.memory.private, mode='write')
-        dump_multi_inner_sync(
-            me.group_path, me.memory.group, mode='write')
-        logger.info(f'Person {me.wxid}: 完成保存消息')
+        if not me.memory.private:
+            logger.info('Person 私聊内存为空，跳过保存私聊消息')
+        else:
+            logger.info(f'Person {me.wxid}: 正在保存私聊消息...')
+            dump_multi_inner_sync(
+                me.private_path, me.memory.private, mode='write')
+            logger.info(f'Person {me.wxid}: 完成保存私聊消息')
+            
+        if not me.memory.group:
+            logger.info('Person 群聊内存为空，跳过保存群聊消息')
+        else:
+            logger.info(f'Person {me.wxid}: 正在保存群聊消息...')
+            dump_multi_inner_sync(
+                me.group_path, me.memory.group, mode='write')
+            logger.info(f'Person {me.wxid}: 完成保存消息')
 
     async def update(self, wk_msg: Message):
         """更新消息数据，触发个性分析"""
@@ -112,6 +122,7 @@ class Person(ABC):
                     self.memory.add(group=inner)
 
         if len(self.memory) >= self.threshold:
+            logger.info(f"Person {self.wxid}: 消息数量达到 {len(self.memory.private)} 条私聊消息+ {len(self.memory.group)} 条群聊消息，开始生成朋友画像")
             # 触发更新
             await self.brief_bio(name=self.get_name())
             await self._analyze_personality()

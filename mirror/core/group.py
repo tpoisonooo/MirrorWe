@@ -68,10 +68,14 @@ class Group(ABC):
             logger.info('Group 对象已被销毁，跳过保存消息偏移')           
             return
         
+        if me.memory is None:
+            logger.info('Group 内存为空，跳过保存消息')           
+            return
         logger.info(f'Group {me.group_id}: 正在保存 {len(me.memory.group)} 条群聊消息...')
         dump_multi_inner_sync(
             me.group_path, me.memory.group, mode='write')
         logger.info(f'Group {me.group_id}: 完成保存消息')
+
     async def update(self, wk_msg: Message):
         """更新消息数据，触发个性分析"""
         if wk_msg:
@@ -81,6 +85,7 @@ class Group(ABC):
                 self.memory.add(group=inner)
 
         if len(self.memory) >= self.threshold:
+            logger.info(f"Group {self.group_id}: 消息数量达到 {len(self.memory.group)} 条，开始生成群画像")
             await self.brief_bio()
             self.memory.group = self.memory.group[-self.max_keep:]
             await dump_multi_inner_async(self.group_path, self.memory.group, mode='write')
