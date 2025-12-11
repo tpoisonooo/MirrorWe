@@ -42,6 +42,4 @@ class Finish(CallableTool2[FinishParams]):
 
     @override
     async def __call__(self, params: WaitParams) -> ToolReturnValue:
-        value = min(5, max(0, params.seconds_to_wait))
-        await asyncio.sleep(value)
         return ToolOk(output="", message="Just finished.")
