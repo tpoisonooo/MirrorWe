@@ -34,7 +34,7 @@ from dotenv import load_dotenv
 from .primitive import get_env_or_raise, get_env_with_default
 from .primitive import safe_write_text
 from .wechat.cookie import Cookie
-from .wechat.message import Message, get_message_log_paths, save_message_to_file
+from .wechat.message import Message
 
 from .wechat import APIContact, APICircle, APIMessage, APIManage
 from .core.we import get_factory
@@ -264,32 +264,7 @@ async def init_friends_groups_basic():
     if groups:
         logger.info("Processing groups...")
         await init_basic(api_contact, groups, 'groups')
-
-    ## 对每个群友+好友，进行画像初始化
-    current_file = inspect.getfile(inspect.currentframe())
-    friend_dir = os.path.join(os.path.dirname(current_file), "..", "data", "friends")
-    
-    # Ensure friend directory exists
-    os.makedirs(friend_dir, exist_ok=True)
-    
-    # Get existing friend directories
-    existing_friends = set()
-    if os.path.exists(friend_dir):
-        existing_friends = set(os.listdir(friend_dir))
-    
-    # Combine friends from API and existing directories
-    person_list = list(set(friends) | existing_friends)
-    
-    logger.info(f"Initializing profiles for {len(person_list)} people...")
-    
-    factory = get_factory()
-
-    for wxid in tqdm(person_list):
-        logger.debug(f"Initializing profile for {wxid}")
-        p = await factory.get_person_async(wxid=wxid)
-        await p.update(wk_msg=None)
-
-    logger.info("Profile initialization completed")
+    logger.info("Profile basic completed")
     
 
 async def main():
@@ -307,7 +282,7 @@ async def main():
 
     parser.add_argument('--serve',
                         action='store_true',
-                        default=True,
+                        default=False,
                         help='Step3.1 Bind port and listen WeChat message callback')
 
     parser.add_argument('--forward',

@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import List, Dict, Any
 from loguru import logger
 from ..prompt import FRIEND_BIO, SUMMARY_BIO
-from .inner import convert_wkteam_to_inner, Inner, parse_multi_inner_async, dump_multi_inner_sync
+from .inner import convert_wkteam_to_inner, Inner, parse_multi_inner_async, dump_multi_inner_sync, dump_multi_inner_async
 from ..primitive import safe_write_text, try_load_text
 from ..primitive import LLM, always_get_an_event_loop
 from ..wechat.message import Message
@@ -75,8 +75,6 @@ class Person(ABC):
             self.memory.add(private=inner)
         async for inner in parse_multi_inner_async(self.group_path):
             self.memory.add(group=inner)
-        # 消息加载偏移
-        self.offset = (len(self.memory.private), len(self.memory.group))
         
         # 加载基本信息
         self.basic = await try_load_text(self.basic_path)
@@ -88,19 +86,17 @@ class Person(ABC):
         me = self._wr()
         
         if me is None:   
-            logger.info('Person 对象已被销毁，跳过保存消息偏移')           
+            logger.info('Person 对象已被销毁，跳过保存消息')           
             return
 
-        logger.info(f'Person {me.wxid}: 正在保存消息偏移... {me.offset} -> {len(me.memory.private)}, {len(me.memory.group)}')
+        logger.info(f'Person {me.wxid}: 正在保存 {len(me.memory.private)} 私聊消息, {len(me.memory.group)} 群聊消息')
         private_offset, group_offset = me.offset
         
-        if len(me.memory.private) > private_offset:
-            dump_multi_inner_sync(
-                me.private_path, me.memory.private[private_offset:], mode='append')
-        if len(me.memory.group) > group_offset:
-            dump_multi_inner_sync(
-                me.group_path, me.memory.group[group_offset:], mode='append')
-        logger.info(f'Person {me.wxid}: 完成保存消息偏移')
+        dump_multi_inner_sync(
+            me.private_path, me.memory.private, mode='write')
+        dump_multi_inner_sync(
+            me.group_path, me.memory.group, mode='write')
+        logger.info(f'Person {me.wxid}: 完成保存消息')
 
     async def update(self, wk_msg: Message):
         """更新消息数据，触发个性分析"""
@@ -124,7 +120,9 @@ class Person(ABC):
             # 截断消息
             self.memory.private = self.memory.private[-self.max_keep:]
             self.memory.group = self.memory.group[-self.max_keep:]
-            self.offset = (0, 0)
+
+            await dump_multi_inner_async(self.private_path, self.memory.private, mode='write')
+            await dump_multi_inner_async(self.group_path, self.memory.group, mode='write')
 
             logger.info(f"Person {self.wxid}: 当前 {len(self.memory.private)} 条私聊消息+ {len(self.memory.group)} 条群聊消息，完成个性分析")
 

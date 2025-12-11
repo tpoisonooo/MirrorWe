@@ -104,19 +104,20 @@ async def dump_multi_inner_async(file_path: str, objs: List[Inner], mode='write'
     Example:
         await dump_multi_inner_async('data.jsonl', [Inner, Inner, ...]):
     """
-    try:
-        # os.makedirs(os.path.basename(file_path), exist_ok=True)
-        await anyio.Path(file_path).parent.mkdir(parents=True, exist_ok=True)
-        
-        symbol = 'w' if mode == 'write' else 'a'
+    # os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    await anyio.Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+    
+    symbol = 'w' if mode == 'write' else 'a'
+    if 'append' == mode and not os.path.exists(file_path):
+        # 如果文件不存在，改为写入模式
+        symbol = 'w'
 
-        async with aiofiles.open(file_path, symbol, encoding='utf-8') as f:
-            for obj in objs:
-                json_str = obj.to_json(ensure_ascii=False, indent=2)
-                await f.write(json_str + '\n')
-    except Exception as e:
-        logger.error(f"保存文件失败: {file_path}, 错误: {str(e)}")
-        raise
+    async with aiofiles.open(file_path, symbol, encoding='utf-8') as f:
+        for obj in objs:
+            json_str = obj.to_json(ensure_ascii=False, indent=2)
+            await f.write(json_str + '\n')
+        await f.flush()
+
 
 
 async def parse_multi_inner_async(file_path: str, output='inner') -> AsyncGenerator[Any, None]:
@@ -130,7 +131,7 @@ async def parse_multi_inner_async(file_path: str, output='inner') -> AsyncGenera
         解析成功的JSON对象
         
     Example:
-        async for obj in parse_multiline_json_objects_async('data.jsonl'):
+        async for obj in parse_multi_inner_async('data.jsonl'):
             print(obj)
     """
     if not os.path.exists(file_path):

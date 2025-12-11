@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import List, Dict, Any
 from loguru import logger
 from ..prompt import GROUP_BIO, SUMMARY_BIO
-from .inner import convert_to_inner, Inner, parse_multi_inner_async, dump_multi_inner_sync
+from .inner import convert_to_inner, Inner, parse_multi_inner_async, dump_multi_inner_sync, dump_multi_inner_async
 from ..primitive import try_load_text, safe_write_text
 from ..primitive import LLM
 from datetime import datetime
@@ -38,7 +38,6 @@ class Group(ABC):
         self.group_dir = os.path.join(data_dir, 'groups', self.group_id)
         self.basic_path = os.path.join(self.group_dir, "basic.json")
         self.group_path = os.path.join(self.group_dir, "message.jsonl")
-        self.offset = 0
         self.llm = LLM()
         self.bio_path = os.path.join(self.group_dir, "bio.md")
 
@@ -55,8 +54,6 @@ class Group(ABC):
         # 加载数据
         async for inner in parse_multi_inner_async(self.group_path):
             self.memory.add(group=inner)
-        # 消息加载偏移
-        self.offset = len(self.memory.group)
         
         # 加载基本信息
         self.basic = await try_load_text(self.basic_path)
@@ -71,13 +68,10 @@ class Group(ABC):
             logger.info('Group 对象已被销毁，跳过保存消息偏移')           
             return
         
-        logger.info(f'Group {me.group_id}: 正在保存消息偏移...')
-        group_offset = me.offset
-        if len(me.memory.group) > group_offset:
-            dump_multi_inner_sync(
-                me.group_path, me.memory.group[group_offset:], mode='append')
-        logger.info(f'Group {me.group_id}: 完成保存消息偏移')
-
+        logger.info(f'Group {me.group_id}: 正在保存 {len(me.memory.group)} 条群聊消息...')
+        dump_multi_inner_sync(
+            me.group_path, me.memory.group, mode='write')
+        logger.info(f'Group {me.group_id}: 完成保存消息')
     async def update(self, wk_msg: Message):
         """更新消息数据，触发个性分析"""
         if wk_msg:
@@ -89,7 +83,7 @@ class Group(ABC):
         if len(self.memory) >= self.threshold:
             await self.brief_bio()
             self.memory.group = self.memory.group[-self.max_keep:]
-            self.offset = 0
+            await dump_multi_inner_async(self.group_path, self.memory.group, mode='write')
             logger.info(f"Group {self.group_id}: 当前 {len(self.memory.group)} 条群聊消息，完成个性分析")
 
     async def brief_bio(self) -> str:
@@ -127,36 +121,3 @@ class Group(ABC):
         summary = await self.llm.chat_text(prompt=prompt)
         summary_path = os.path.join(self.group_dir, 'summary.md')
         await safe_write_text(summary_path, summary)
-
-    async def load_local(self, message_files: List[str]):
-        """加载 message.jsonl 文件"""
-        try:
-            total_loaded = 0
-            # 解析多行JSON格式
-            for messages_file in message_files:
-                if not os.path.exists(messages_file):
-                    continue
-                
-                file_loaded = 0
-                async for obj in parse_multiline_json_objects_async(messages_file):
-                    data = obj.get('data', {})
-                    is_self = data.get('self', False)
-                    content = data.get('content', '').strip()
-                    name = data.get('pushContent', ':').split(':')[0].strip()
-                    ts = data.get('timestamp', 0)
-
-                    if obj.get('messageType') == '80001':
-                        message = {"content":f"{name}:{content}", "ts":ts}
-                        self.memory.add(group=message)
-                        file_loaded += 1
-                
-                total_loaded += file_loaded
-                logger.info(f"从 {messages_file} 加载了 {file_loaded} 条有效消息")
-            
-            logger.info(f"总共加载了 {total_loaded} 条有效消息")
-            
-        except Exception as e:
-            logger.error(f"加载本地消息数据失败: {e}")
-            import traceback
-            traceback.print_exc()
-    

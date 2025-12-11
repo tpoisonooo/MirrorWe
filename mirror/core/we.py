@@ -30,7 +30,7 @@ class WeFactory:
     4. 同步消息数据到本地文件夹
     """
     
-    def __init__(self, max_cache_size: int = 100):
+    def __init__(self, max_cache_size: int = 128):
         """
         初始化工厂
         
@@ -304,7 +304,7 @@ class WeFactory:
 _factory_instance: Optional[WeFactory] = None
 
 
-def get_factory(max_cache_size: int = 32) -> WeFactory:
+def get_factory(max_cache_size: int = 128) -> WeFactory:
     """
     获取全局工厂实例（单例模式）
     
