@@ -63,7 +63,7 @@ class Doll:
         step = 0
         max_step_size = 5
 
-        system_prompt = '{}\n\n{}'.format(time_string(), load_desc(Path(__file__).parent / "private_doll.md", {})) 
+        system_prompt = '{}\n\n{}'.format(time_string(), load_desc(Path(__file__).parent / "doll.md", {})) 
 
         current = p.memory.private[-1]
         local = p.memory.private[0:-1] if len(p.memory.private) > 1 else []
@@ -102,18 +102,18 @@ class Doll:
             history.extend(tool_messages)
 
 
-    async def agent_loop_group(self, g: Group):
+    async def agent_loop_group(self, g: Group, p: Person):
         history: list[Message] = []
         step = 0
-        max_step_size = 4
+        max_step_size = 2
 
-        system_prompt = '{}\n\n{}'.format(time_string(), load_desc(Path(__file__).parent / "group_doll.md", {})) 
+        system_prompt = '{}\n\n{}'.format(time_string(), load_desc(Path(__file__).parent / "doll.md", {})) 
         input_template = (Path(__file__).parent / "group_input.md").read_text(encoding="utf-8")
 
         current = g.memory.group[-1]
         local=g.memory.group[-30:-1] if len(g.memory.group) > 1 else []
 
-        content = input_template.format(current=current, basic=g.basic, bio=g.bio, local=str(local))
+        content = input_template.format(current=current, person_bio=p.bio, group_bio=g.bio, local=str(local))
         history.append(Message(role="user", content=content))
 
         while step < max_step_size:

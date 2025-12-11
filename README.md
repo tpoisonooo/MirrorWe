@@ -29,8 +29,8 @@
 - [HuixiangDou](https://github.com/internlm/huixiangdou) 微信接入方法
 
 ## 开发随感
+- 20251211 性格是啥？对事件的应对。抛开初始条件看的话，性格其实就是经历本身、是路径依赖、是手里已经有的牌。所以不能直接 assign bot 一个什么性格，应该 assign 经历。
 - 20251211 朋友圈是高危区域，啊被封了
-- 20251210 [bad doll](./mirror/actor/bad_doll.md) 攻击性太强了、容易翻车。还是茶一点吧.. [突然有个 idea]
 - 20251209 做成通用框架，还是纯应用向？以 MirrorDoll 吸引用户，repo 还是通用路线
 - 20251130 观察到微信群复读导致 modeling 出现偏差。例如某人消息里太多“白座”，会认为这个群友是白座。已修复。
 - 20251129 想方便可视化 jsonl@indent=2，又期望高性能用 pyarrow，难兼顾。

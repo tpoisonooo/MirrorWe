@@ -183,13 +183,14 @@ class WkteamManager:
 
             elif msg._type.startswith('8'):
                 # 6. 如果群聊消息，更新发送人和群记录
-                await (await self.factory.get_person_async(wxid=msg.sender_id)).update(wk_msg=msg)
+                p = await self.factory.get_person_async(wxid=msg.sender_id)
+                await p.update(wk_msg=msg)
                 g = await self.factory.get_group_async(group_id=msg.group_id)
                 await g.update(wk_msg=msg)
                 
                 # 如果是配置的 act_group_id，则触发群内处理
                 if self.actor and self.act_group_id in msg.group_id:
-                    await self.actor.agent_loop_group(g)
+                    await self.actor.agent_loop_group(g, p)
 
             # 7. 如果是群消息，是否需要跨群转发
             if msg._type.startswith('8') and forward:

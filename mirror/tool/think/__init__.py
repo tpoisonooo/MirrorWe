@@ -30,4 +30,18 @@ class Wait(CallableTool2[WaitParams]):
     async def __call__(self, params: WaitParams) -> ToolReturnValue:
         value = min(5, max(0, params.seconds_to_wait))
         await asyncio.sleep(value)
-        return ToolOk(output="", message="Wait finished.")
+        return ToolOk(output="", message="A few seconds later.")
+    
+class FinishParams(BaseModel):
+    pass
+
+class Finish(CallableTool2[FinishParams]):
+    name: str = "Finish"
+    description: str = load_desc(Path(__file__).parent / "finish.md", {})
+    params: type[FinishParams] = FinishParams
+
+    @override
+    async def __call__(self, params: WaitParams) -> ToolReturnValue:
+        value = min(5, max(0, params.seconds_to_wait))
+        await asyncio.sleep(value)
+        return ToolOk(output="", message="Just finished.")

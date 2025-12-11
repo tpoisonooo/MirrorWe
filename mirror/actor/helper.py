@@ -6,7 +6,7 @@ from kosong.chat_provider.kimi import Kimi
 from ..tool.circle import GetCircle, SnsPraise, SnsComment, SnsSend
 from ..tool.contact import ListGroup, ListPrivateFriend, GroupChatFriend, SearchAndAdd, GetContact
 from ..tool.message import RevertAll, SendGroupUrl, SendGroupEmoji, SendGroupText, SendGroupImage, SendUserText
-from ..tool.think import Think, Wait
+from ..tool.think import Think, Wait, Finish
 from ..primitive import load_desc, time_string
 from ..core import Person
 
@@ -39,4 +39,5 @@ def build_toolset():
     # 思考，必须
     toolset += Think()
     toolset += Wait()
+    toolset += Finish()
     return toolset

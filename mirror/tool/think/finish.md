@@ -1,0 +1,1 @@
+Doing nothing and finish this event. 你不知道怎么应对，或者不想应对，再或者觉得做应对没价值。
