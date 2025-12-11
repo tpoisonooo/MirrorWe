@@ -56,6 +56,7 @@ class Person(ABC):
         # 同时开始更新 bio
         self.threshold = 512  # AKA 多少条消息，足以刻画这个人
         self.max_keep = 128
+        self.update_counter = 0
 
         # 销毁遗言，保留数据
         self._wr = weakref.ref(self)
@@ -110,16 +111,17 @@ class Person(ABC):
 
     async def update(self, wk_msg: Message):
         """更新消息数据，触发个性分析"""
+        self.update_counter += 1
+
         if wk_msg:
             # 如果是私聊消息，加 private，否则加 group
             inner = convert_wkteam_to_inner(wk_msg) 
-            match wk_msg._type:
-                case '60001' | 60001:
-                    self.memory.add(private=inner)
-                case '80001' | 80001:
-                    if wk_msg.is_self:
-                        return  # 跳过自己的群消息（可能是自己的 forward 消息）
-                    self.memory.add(group=inner)
+            if wk_msg._type.startswith('6'):
+                self.memory.add(private=inner)
+            elif wk_msg._type.startswith('8'):
+                if wk_msg.is_self:
+                    return  # 跳过自己的群消息（可能是自己的 forward 消息）
+                self.memory.add(group=inner)
 
         if len(self.memory) >= self.threshold:
             logger.info(f"Person {self.wxid}: 消息数量达到 {len(self.memory.private)} 条私聊消息+ {len(self.memory.group)} 条群聊消息，开始生成朋友画像")
@@ -136,6 +138,10 @@ class Person(ABC):
             await dump_multi_inner_async(self.group_path, self.memory.group, mode='write')
 
             logger.info(f"Person {self.wxid}: 当前 {len(self.memory.private)} 条私聊消息+ {len(self.memory.group)} 条群聊消息，完成个性分析")
+        
+        elif self.update_counter > 0 and self.update_counter % 10 == 0:
+            await dump_multi_inner_async(self.private_path, self.memory.private, mode='write')
+            await dump_multi_inner_async(self.group_path, self.memory.group, mode='write')
 
     async def brief_bio(self, name:str) -> str:
         """生成朋友的  bio.md 文件，做个 summary.md"""

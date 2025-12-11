@@ -77,6 +77,8 @@ def dump_multi_inner_sync(file_path: str, objs: List[Inner], mode='write'):
     Example:
         dump_multi_inner_sync('data.jsonl', [Inner, Inner, ...])
     """
+    if not objs:
+        return
     # 创建父目录
     Path(file_path).parent.mkdir(parents=True, exist_ok=True)
     
@@ -105,8 +107,11 @@ async def dump_multi_inner_async(file_path: str, objs: List[Inner], mode='write'
         await dump_multi_inner_async('data.jsonl', [Inner, Inner, ...]):
     """
     # os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    if not objs:
+        return
+
     await anyio.Path(file_path).parent.mkdir(parents=True, exist_ok=True)
-    
+
     symbol = 'w' if mode == 'write' else 'a'
     if 'append' == mode and not os.path.exists(file_path):
         # 如果文件不存在，改为写入模式

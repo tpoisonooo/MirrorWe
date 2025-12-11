@@ -15,6 +15,8 @@ from typing import List, Dict, Any
 from loguru import logger
 from ..prompt import GROUP_BIO, SUMMARY_BIO
 from .inner import convert_to_inner, Inner, parse_multi_inner_async, dump_multi_inner_sync, dump_multi_inner_async
+from .inner import convert_wkteam_to_inner
+
 from ..primitive import try_load_text, safe_write_text
 from ..primitive import LLM
 from datetime import datetime
@@ -45,6 +47,7 @@ class Group(ABC):
         # 同时开始更新 bio
         self.threshold = 4096
         self.max_keep = 1024
+        self.update_counter = 0
 
         # 销毁遗言，保留数据
         self._wr = weakref.ref(self)
@@ -80,8 +83,8 @@ class Group(ABC):
         """更新消息数据，触发个性分析"""
         if wk_msg:
             # 如果是群聊消息，加 group
-            inner = convert_to_inner(wk_msg) 
-            if hasattr(wk_msg, '_type') and str(wk_msg._type) in ['80001', '80001']:
+            inner = convert_wkteam_to_inner(wk_msg) 
+            if wk_msg._type.startswith('8'):
                 self.memory.add(group=inner)
 
         if len(self.memory) >= self.threshold:
@@ -90,6 +93,8 @@ class Group(ABC):
             self.memory.group = self.memory.group[-self.max_keep:]
             await dump_multi_inner_async(self.group_path, self.memory.group, mode='write')
             logger.info(f"Group {self.group_id}: 当前 {len(self.memory.group)} 条群聊消息，完成个性分析")
+        elif self.update_counter > 0 and self.update_counter % 10 == 0:
+            await dump_multi_inner_async(self.group_path, self.memory.group, mode='write')
 
     async def brief_bio(self) -> str:
         """生成群的  bio.md 文件"""

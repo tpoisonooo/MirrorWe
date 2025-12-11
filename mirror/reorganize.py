@@ -30,10 +30,11 @@ if __name__ == "__main__":
     import sys
 
     filepaths = [
-        '/root/konghuanjun/HuixiangDou/wkteam/wechat_message.jsonl.20250305',
-        '/root/konghuanjun/HuixiangDou/wkteam/wechat_message.jsonl.20250312',
-        '/root/konghuanjun/HuixiangDou/wkteam/wechat_message.jsonl.20250403',
-        '/root/konghuanjun/HuixiangDou/wkteam/wechat_message.jsonl.20250813',
-        '/root/konghuanjun/HuixiangDou3/data.1211/origin.jsonl',
+        # '/root/konghuanjun/HuixiangDou/wkteam/wechat_message.jsonl.20250305',
+        # '/root/konghuanjun/HuixiangDou/wkteam/wechat_message.jsonl.20250312',
+        # '/root/konghuanjun/HuixiangDou/wkteam/wechat_message.jsonl.20250403',
+        # '/root/konghuanjun/HuixiangDou/wkteam/wechat_message.jsonl.20250813',
+        '/root/konghuanjun/HuixiangDou3/data/origin.jsonl',
+        # '/root/konghuanjun/HuixiangDou/wkteam/origin.jsonl'
     ]
     asyncio.run(from_origin(filepaths))

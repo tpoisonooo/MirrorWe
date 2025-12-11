@@ -34,7 +34,7 @@ from dotenv import load_dotenv
 from .primitive import get_env_or_raise, get_env_with_default
 from .primitive import safe_write_text
 from .wechat.cookie import Cookie
-from .wechat.message import Message
+from .wechat.message import Message, save_message_to_file
 
 from .wechat import APIContact, APICircle, APIMessage, APIManage
 from .core.we import get_factory
@@ -58,14 +58,16 @@ class WkteamManager:
         self.api_manage = APIManage()
         self.api_contact = APIContact()
         self.actor = None
+        self.act_group_id = None
         self.factory = get_factory()
     
-    def setup(self, actor:str=None):
-        match actor:
+    def setup(self, args):
+        match args.actor:
             case 'doll':
                 from .actor import Doll
                 self.actor = Doll()
-        
+        self.act_group_id = args.act_group_id
+
     async def bind(self, forward:bool=False, life:int=3600*7*30*12):
         logdir = self.cookie.data_dir
         port = self.cookie.callback_port
@@ -171,25 +173,29 @@ class WkteamManager:
                 await sns_praise_first_one(input_json.get('data', {'fromUser':''}).get('fromUser', ''))
                 return web.json_response(text='accept user')
 
-            elif '6' in msg._type:
+            elif msg._type.startswith('6'):
                 # 5. 如果私聊消息，更新发送人记录
                 p = await self.factory.get_person_async(wxid=msg.sender_id)
                 await p.update(wk_msg=msg)
 
                 if self.actor:
-                    await self.actor.agent_loop(p)
+                    await self.actor.agent_loop_private(p)
 
-            elif '80001' in msg._type:
+            elif msg._type.startswith('8'):
                 # 6. 如果群聊消息，更新发送人和群记录
                 await (await self.factory.get_person_async(wxid=msg.sender_id)).update(wk_msg=msg)
-                await (await self.factory.get_group_async(group_id=msg.group_id)).update(wk_msg=msg)
+                g = await self.factory.get_group_async(group_id=msg.group_id)
+                await g.update(wk_msg=msg)
+                
+                # 如果是配置的 act_group_id，则触发群内处理
+                if self.actor and self.act_group_id in msg.group_id:
+                    await self.actor.agent_loop_group(g)
 
             # 7. 如果是群消息，是否需要跨群转发
             if msg._type.startswith('8') and forward:
                 await forward_to_groups(msg)
 
             return web.json_response(text='done')
-
             
 
         # async bind，手动管理生命周期
@@ -300,10 +306,15 @@ async def main():
                         default='doll',
                         help='Actor to response private chat, default: doll')
 
+    parser.add_argument('--act_group_id',
+                        type=str,
+                        default=None,
+                        help='Group ID to activate actor responses within the group')
+
     args = parser.parse_args()
 
     manager = WkteamManager()
-    manager.setup(actor=args.actor)
+    manager.setup(args)
 
     if args.login:
         await manager.api_manage.login()

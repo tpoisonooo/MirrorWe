@@ -290,14 +290,11 @@ class WeFactory:
     
     def _cleanup_all(self):
         """程序退出时的清理函数"""
-        try:
-            # Person和Group对象已经通过atexit注册了自己的清理函数
-            # 这里只需要清理缓存引用
-            self._person_cache.clear()
-            self._group_cache.clear()
-            logger.info("WeFactory缓存清理完成")
-        except Exception as e:
-            logger.error(f"清理工厂资源时出错: {e}")
+        # Person和Group对象已经通过atexit注册了自己的清理函数
+        # 这里只需要清理缓存引用
+        self._person_cache.clear()
+        self._group_cache.clear()
+        logger.info("WeFactory缓存清理完成")
 
 
 # 全局工厂实例
