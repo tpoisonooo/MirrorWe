@@ -4,10 +4,11 @@ import json
 from loguru import logger
 from .cookie import Cookie
 from .helper import async_post
+from ..primitive.metaclass import SingletonMeta
 import asyncio
 import random
 
-class APIContact:
+class APIContact(metaclass=SingletonMeta):
     def __init__(self):
         self.cookie = Cookie()
 

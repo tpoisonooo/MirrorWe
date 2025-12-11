@@ -8,17 +8,23 @@ import os
 import sys
 import inspect
 import aiofiles
+import weakref
+import atexit
 from pathlib import Path
 from typing import List, Dict, Any
 from loguru import logger
 from ..prompt import GROUP_BIO, SUMMARY_BIO
-from ..primitive import parse_multiline_json_objects_async, dump_multiline_json_objects_async
+from .inner import convert_to_inner, Inner, parse_multi_inner_async, dump_multi_inner_sync, dump_multi_inner_async
+from .inner import convert_wkteam_to_inner
+
 from ..primitive import try_load_text, safe_write_text
 from ..primitive import LLM
 from datetime import datetime
+from ..wechat.message import Message
 
 # 添加项目路径
 from mirror.core.memory import MemoryStream
+from mirror.primitive import always_get_an_event_loop
 
 # TODO
 class Group(ABC):
@@ -35,27 +41,60 @@ class Group(ABC):
         self.basic_path = os.path.join(self.group_dir, "basic.json")
         self.group_path = os.path.join(self.group_dir, "message.jsonl")
         self.llm = LLM()
+        self.bio_path = os.path.join(self.group_dir, "bio.md")
 
         # 群聊累计达到 threshold 条消息，就只保留末尾 max_keep 条有效的
         # 同时开始更新 bio
         self.threshold = 4096
         self.max_keep = 1024
+        self.update_counter = 0
 
-        # 文件最小值
-        self.min_file_size_kb = 64 * 1024
+        # 销毁遗言，保留数据
+        self._wr = weakref.ref(self)
+        atexit.register(self._atexit_dump)
 
-    async def update(self):
-        # 尝试加载本地消息数据
-        group_file_size = os.path.getsize(self.group_path) if os.path.exists(self.group_path) else 0
+    async def initialize(self):
+        # 加载数据
+        async for inner in parse_multi_inner_async(self.group_path):
+            self.memory.add(group=inner)
+        
+        # 加载基本信息
+        self.basic = await try_load_text(self.basic_path)
+        self.bio = await try_load_text(self.bio_path)
+        # 扔个空消息，触发分析
+        await self.update(wk_msg=None)
 
-        # 没啥消息的空群，跳过
-        if group_file_size < self.min_file_size_kb and not os.path.exists(self.basic_path):
+    def _atexit_dump(self):
+        me = self._wr()
+        
+        if me is None:   
+            logger.info('Group 对象已被销毁，跳过保存消息偏移')           
             return
+        
+        if me.memory is None:
+            logger.info('Group 内存为空，跳过保存消息')           
+            return
+        logger.info(f'Group {me.group_id}: 正在保存 {len(me.memory.group)} 条群聊消息...')
+        dump_multi_inner_sync(
+            me.group_path, me.memory.group, mode='write')
+        logger.info(f'Group {me.group_id}: 完成保存消息')
 
-        await self.load_local([self.group_path])
+    async def update(self, wk_msg: Message):
+        """更新消息数据，触发个性分析"""
+        if wk_msg:
+            # 如果是群聊消息，加 group
+            inner = convert_wkteam_to_inner(wk_msg) 
+            if wk_msg._type.startswith('8'):
+                self.memory.add(group=inner)
+
         if len(self.memory) >= self.threshold:
+            logger.info(f"Group {self.group_id}: 消息数量达到 {len(self.memory.group)} 条，开始生成群画像")
             await self.brief_bio()
-            await dump_multiline_json_objects_async(self.group_path, self.memory.group[-self.max_keep:])
+            self.memory.group = self.memory.group[-self.max_keep:]
+            await dump_multi_inner_async(self.group_path, self.memory.group, mode='write')
+            logger.info(f"Group {self.group_id}: 当前 {len(self.memory.group)} 条群聊消息，完成个性分析")
+        elif self.update_counter > 0 and self.update_counter % 10 == 0:
+            await dump_multi_inner_async(self.group_path, self.memory.group, mode='write')
 
     async def brief_bio(self) -> str:
         """生成群的  bio.md 文件"""
@@ -76,10 +115,11 @@ class Group(ABC):
             cut_group_index = max(0, int(cut_ratio * len(self.memory.group)))
 
         group = self.memory.group[-cut_group_index:]
+        group_json_str = Inner.schema().dumps(group, many=True, ensure_ascii=False)
         prompt = GROUP_BIO.format(
             basic=basic,
             bio=bio,
-            group=json.dumps(group, ensure_ascii=False, indent=2))
+            group=group_json_str)
         # 使用新的LLM适配器
         try:
             self.bio = await self.llm.chat_text(prompt)
@@ -91,36 +131,3 @@ class Group(ABC):
         summary = await self.llm.chat_text(prompt=prompt)
         summary_path = os.path.join(self.group_dir, 'summary.md')
         await safe_write_text(summary_path, summary)
-
-    async def load_local(self, message_files: List[str]):
-        """加载 message.jsonl 文件"""
-        try:
-            total_loaded = 0
-            # 解析多行JSON格式
-            for messages_file in message_files:
-                if not os.path.exists(messages_file):
-                    continue
-                
-                file_loaded = 0
-                async for obj in parse_multiline_json_objects_async(messages_file):
-                    data = obj.get('data', {})
-                    is_self = data.get('self', False)
-                    content = data.get('content', '').strip()
-                    name = data.get('pushContent', ':').split(':')[0].strip()
-                    ts = data.get('timestamp', 0)
-
-                    if obj.get('messageType') == '80001':
-                        message = {"content":f"{name}:{content}", "ts":ts}
-                        self.memory.add(group=message)
-                        file_loaded += 1
-                
-                total_loaded += file_loaded
-                logger.info(f"从 {messages_file} 加载了 {file_loaded} 条有效消息")
-            
-            logger.info(f"总共加载了 {total_loaded} 条有效消息")
-            
-        except Exception as e:
-            logger.error(f"加载本地消息数据失败: {e}")
-            import traceback
-            traceback.print_exc()
-    

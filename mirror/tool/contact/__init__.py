@@ -3,8 +3,8 @@ from typing import override, List
 
 from kosong.tooling import CallableTool2, ToolOk, ToolReturnValue
 from pydantic import BaseModel, Field
-from ...primitive import parse_multiline_json_objects_async, try_load_text
-from ...primitive import load_desc
+from ...core.inner import parse_multi_inner_async 
+from ...primitive import load_desc, try_load_text
 
 import inspect
 import os
@@ -73,7 +73,7 @@ class GroupChatFriend(CallableTool2[GroupChatFriendParams]):
             
             group_id = ''
             name = ''
-            async for obj in parse_multiline_json_objects_async(group_segment_path):
+            async for obj in parse_multi_inner_async(group_segment_path):
                 if obj.get('messageType') == '80001':
                     data = obj.get('data', {})
                     group_id = data.get('fromGroup', '')

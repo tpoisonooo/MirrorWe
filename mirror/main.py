@@ -115,7 +115,7 @@ async def main():
     chat_provider = Kimi(base_url=base_url, api_key=api_key, model=model)
 
     toolset = await build_toolset()
-    # 找到 Yoh 的联系方式，想办法给他发条消息。内容随意，写个他可能感兴趣会回复的话题。
+    # 找到 🎈 的联系方式，想办法给他发条消息。内容随意，写个她可能感兴趣会回复的话题。 或者告诉她 “你老公一会儿下班”
     await agent_loop(chat_provider, toolset)
 
 asyncio.run(main())

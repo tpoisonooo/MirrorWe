@@ -4,13 +4,13 @@ import json
 from loguru import logger
 from .cookie import Cookie
 from .helper import async_post
-from ..primitive import safe_write_text
+from ..primitive import safe_write_text, SingletonMeta
 import aiofiles
 import time
 
 system_start_time = time.time()
 
-class APIManage:
+class APIManage(metaclass=SingletonMeta):
     def __init__(self):
         self.cookie = Cookie()
 

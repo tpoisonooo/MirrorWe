@@ -33,7 +33,7 @@ class Message:
 
     def parse(self, wx_msg: dict, bot_wxid: str, auth:str='', wkteam_ip_port:str=''):
         # str or int
-        _type = wx_msg['messageType']
+        _type = wx_msg.get('messageType', '')
         parse_type = 'unknown'
         data = wx_msg.get('data', {})
         if not data or type(data) is not dict:
@@ -91,7 +91,7 @@ class Message:
             self.desc = desc
             self.thumb_url = search_key(xml_key='thumburl')
             
-            query = data['pushContent']
+            query = data.get('pushContent', '')
 
         elif _type in ['80006']:
             parse_type = 'emoji'
@@ -125,12 +125,13 @@ class Message:
         self._type = _type
         self.is_self = data.get('self', False)
         self.sender_id = data.get('toUser' if self.is_self else 'fromUser', '')
-        self.data = data
         self.new_msg_id = data.get('newMsgId', '')
         self.type = parse_type
         self.group_id = data.get('fromGroup', '')
         self.push_content = data.get('pushContent', '')
         self.content = content
+        self.ts = data.get('timestamp', 0)
+        self.data = data
         return None
 
     def need_revert(self) -> bool:
@@ -148,45 +149,6 @@ class Message:
             elif revert_cmd in self.content:
                 return True
         return False
-
-def get_message_log_paths(logdir:str, message_type: str, sender_id: str, group_id: str) -> List[str]:
-    """根据消息类型和发送者获取对应的日志文件路径"""
-    try:
-        # 私聊消息 (600开头)
-        if message_type.startswith('6'):
-            # 为每个好友创建目录
-            friend_dir = os.path.join(logdir, 'friends', sender_id)
-            if not os.path.exists(friend_dir):
-                os.makedirs(friend_dir)
-            return os.path.join(friend_dir, 'message.jsonl')
-        
-        # 群聊消息 (800开头)
-        elif message_type.startswith('8'):
-            # 为每个群创建目录
-            group_dir = os.path.join(logdir, 'groups', group_id)
-            if not os.path.exists(group_dir):
-                os.makedirs(group_dir)
-        
-            paths = [os.path.join(group_dir, 'message.jsonl')]
-            if 'chatroom' not in sender_id:
-                paths.append(os.path.join(logdir, 'friends', sender_id, 'group_segment.jsonl'))
-            return paths
-
-        # 其他类型的消息，保存在原始日志目录
-        else:
-            other_dir = os.path.join(logdir, 'others')
-            if not os.path.exists(other_dir):
-                os.makedirs(other_dir)
-            return os.path.join(other_dir, 'message.jsonl')
-            
-    except Exception as e:
-        import pdb; pdb.set_trace()
-        logger.error(f"获取消息日志路径失败: {str(e)}")
-        # 如果出错，返回一个默认路径
-        default_dir = os.path.join(logdir, 'default')
-        if not os.path.exists(default_dir):
-            os.makedirs(default_dir)
-        return os.path.join(default_dir, 'message.jsonl')
 
 async def save_message_to_file(file_paths: Union[List[str],str], message: dict):
     """保存消息到指定的jsonl文件"""

@@ -43,7 +43,6 @@ class Doll:
         self.chat_provider = Kimi(base_url=base_url, api_key=api_key, model=model)
         self.toolset = build_toolset()
 
-        self.input_template = (Path(__file__).parent / "agent_input.md").read_text(encoding="utf-8")
         self.welcome_template = (Path(__file__).parent / "agent_welcome.md").read_text(encoding="utf-8")
         logger.info(f'Awake {__name__}, available tools {str(self.toolset._tool_dict)}')
 
@@ -59,20 +58,62 @@ class Doll:
         # TODO
         pass
 
-    async def agent_loop(self, p: Person):
+    async def agent_loop_private(self, p: Person):
         history: list[Message] = []
         step = 0
         max_step_size = 5
 
-        system_prompt = '{}\n\n{}'.format(time_string(), load_desc(Path(__file__).parent / "doll.md", {})) 
+        system_prompt = '{}\n\n{}'.format(time_string(), load_desc(Path(__file__).parent / "private_doll.md", {})) 
 
         current = p.memory.private[-1]
+        local = p.memory.private[0:-1] if len(p.memory.private) > 1 else []
+            
+        input_template = (Path(__file__).parent / "private_input.md").read_text(encoding="utf-8")
+        content = input_template.format(current=current, basic=p.basic, bio=p.bio, personality=str(p.analysis_result), local=str(local))
+        history.append(Message(role="user", content=content))
 
-        if len(p.memory.private) > 1:
-            local = p.memory.private[0:-1]
-        else:
-            local=[]
-        content = self.input_template.format(current=current, basic=p.basic, bio=p.bio, personality=str(p.analysis_result), local=str(p.memory.private))
+        while step < max_step_size:
+            step += 1
+            result = await kosong.step(
+                chat_provider=self.chat_provider,
+                system_prompt=system_prompt,
+                toolset=self.toolset,
+                history=history,
+            )
+
+            await asyncio.sleep(1)
+
+            tool_results = await result.tool_results()
+            print(tool_results)
+
+            assistant_message = result.message
+            tool_messages = [self.tool_result_to_message(tr) for tr in tool_results]
+
+            if s := assistant_message.extract_text():
+                print("Assistant:\n", textwrap.indent(s, "  "))
+            for tool_msg in tool_messages:
+                if s := tool_msg.extract_text():
+                    print("Tool:\n", textwrap.indent(s, "  "))
+
+            if not result.tool_calls:
+                break
+
+            history.append(result.message)
+            history.extend(tool_messages)
+
+
+    async def agent_loop_group(self, g: Group):
+        history: list[Message] = []
+        step = 0
+        max_step_size = 4
+
+        system_prompt = '{}\n\n{}'.format(time_string(), load_desc(Path(__file__).parent / "group_doll.md", {})) 
+        input_template = (Path(__file__).parent / "group_input.md").read_text(encoding="utf-8")
+
+        current = g.memory.group[-1]
+        local=g.memory.group[-30:-1] if len(g.memory.group) > 1 else []
+
+        content = input_template.format(current=current, basic=g.basic, bio=g.bio, local=str(local))
         history.append(Message(role="user", content=content))
 
         while step < max_step_size:

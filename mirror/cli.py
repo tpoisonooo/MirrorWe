@@ -34,10 +34,10 @@ from dotenv import load_dotenv
 from .primitive import get_env_or_raise, get_env_with_default
 from .primitive import safe_write_text
 from .wechat.cookie import Cookie
-from .wechat.message import Message, get_message_log_paths, save_message_to_file
+from .wechat.message import Message, save_message_to_file
 
 from .wechat import APIContact, APICircle, APIMessage, APIManage
-from .core import Person, Group
+from .core.we import get_factory
 from .primitive import LLM, get_env_or_raise, always_get_an_event_loop
 from .prompt import SUMMARY_BIO
 
@@ -58,13 +58,16 @@ class WkteamManager:
         self.api_manage = APIManage()
         self.api_contact = APIContact()
         self.actor = None
+        self.act_group_id = None
+        self.factory = get_factory()
     
-    def setup(self, actor:str=None):
-        match actor:
+    def setup(self, args):
+        match args.actor:
             case 'doll':
                 from .actor import Doll
                 self.actor = Doll()
-        
+        self.act_group_id = args.act_group_id
+
     async def bind(self, forward:bool=False, life:int=3600*7*30*12):
         logdir = self.cookie.data_dir
         port = self.cookie.callback_port
@@ -153,9 +156,6 @@ class WkteamManager:
                 logger.warning(text)
                 return web.json_response(text=text)
 
-            # 分类保存
-            specific_logpaths = get_message_log_paths(logdir=logdir, message_type=msg._type, sender_id=msg.sender_id, group_id=msg.group_id)
-            await save_message_to_file(specific_logpaths, input_json)
 
             # 3. 是否需要撤回
             if msg.need_revert():
@@ -173,25 +173,29 @@ class WkteamManager:
                 await sns_praise_first_one(input_json.get('data', {'fromUser':''}).get('fromUser', ''))
                 return web.json_response(text='accept user')
 
-            elif '6' in msg._type:
+            elif msg._type.startswith('6'):
                 # 5. 如果私聊消息，更新发送人记录
-                p = Person(wxid=msg.sender_id)
-                await p.update()
+                p = await self.factory.get_person_async(wxid=msg.sender_id)
+                await p.update(wk_msg=msg)
 
                 if self.actor:
-                    await self.actor.agent_loop(p)
+                    await self.actor.agent_loop_private(p)
 
-            elif '80001' in msg._type:
+            elif msg._type.startswith('8'):
                 # 6. 如果群聊消息，更新发送人和群记录
-                await Person(wxid=msg.sender_id).update()
-                await Group(group_id=msg.group_id).update()
+                await (await self.factory.get_person_async(wxid=msg.sender_id)).update(wk_msg=msg)
+                g = await self.factory.get_group_async(group_id=msg.group_id)
+                await g.update(wk_msg=msg)
+                
+                # 如果是配置的 act_group_id，则触发群内处理
+                if self.actor and self.act_group_id in msg.group_id:
+                    await self.actor.agent_loop_group(g)
 
             # 7. 如果是群消息，是否需要跨群转发
             if msg._type.startswith('8') and forward:
                 await forward_to_groups(msg)
 
             return web.json_response(text='done')
-
             
 
         # async bind，手动管理生命周期
@@ -266,30 +270,7 @@ async def init_friends_groups_basic():
     if groups:
         logger.info("Processing groups...")
         await init_basic(api_contact, groups, 'groups')
-
-    ## 对每个群友+好友，进行画像初始化
-    current_file = inspect.getfile(inspect.currentframe())
-    friend_dir = os.path.join(os.path.dirname(current_file), "..", "data", "friends")
-    
-    # Ensure friend directory exists
-    os.makedirs(friend_dir, exist_ok=True)
-    
-    # Get existing friend directories
-    existing_friends = set()
-    if os.path.exists(friend_dir):
-        existing_friends = set(os.listdir(friend_dir))
-    
-    # Combine friends from API and existing directories
-    person_list = list(set(friends) | existing_friends)
-    
-    logger.info(f"Initializing profiles for {len(person_list)} people...")
-    
-    for wxid in tqdm(person_list):
-        logger.debug(f"Initializing profile for {wxid}")
-        p = Person(wxid=wxid)
-        await p.update()
-            
-    logger.info("Profile initialization completed")
+    logger.info("Profile basic completed")
     
 
 async def main():
@@ -307,7 +288,7 @@ async def main():
 
     parser.add_argument('--serve',
                         action='store_true',
-                        default=True,
+                        default=False,
                         help='Step3.1 Bind port and listen WeChat message callback')
 
     parser.add_argument('--forward',
@@ -325,10 +306,15 @@ async def main():
                         default='doll',
                         help='Actor to response private chat, default: doll')
 
+    parser.add_argument('--act_group_id',
+                        type=str,
+                        default=None,
+                        help='Group ID to activate actor responses within the group')
+
     args = parser.parse_args()
 
     manager = WkteamManager()
-    manager.setup(actor=args.actor)
+    manager.setup(args)
 
     if args.login:
         await manager.api_manage.login()

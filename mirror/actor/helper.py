@@ -38,5 +38,5 @@ def build_toolset():
 
     # 思考，必须
     toolset += Think()
-    # toolset += Wait()
+    toolset += Wait()
     return toolset
