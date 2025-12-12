@@ -30,7 +30,9 @@ from kosong.message import ContentPart, Message, TextPart, ThinkPart, ToolCall, 
 from kosong.tooling import Tool
 from kosong.chat_provider import APIStatusError, StreamedMessagePart
 
+
 class ChatCache:
+
     def __init__(self, file_path: str = '.cache_llm'):
         self.file_path = file_path
         with DB(self.file_path) as db:
@@ -51,16 +53,17 @@ class ChatCache:
             md5.update(content)
         return md5.hexdigest()[0:6]
 
-    def add(self, query: str, response: str, backend:str='default'):
+    def add(self, query: str, response: str, backend: str = 'default'):
         _hash = self.hash(query)
-        
+
         with DB(self.file_path) as db:
-            db.execute('''
+            db.execute(
+                '''
                 INSERT OR IGNORE INTO chat (_hash, query, response, backend)
                 VALUES (?, ?, ?, ?)
             ''', (_hash, query, response, backend))
-        
-    def get(self, query: str, backend:str='default') -> Union[str, None]:
+
+    def get(self, query: str, backend: str = 'default') -> Union[str, None]:
         """Retrieve a chunk by its ID."""
         if not query:
             return None
@@ -75,7 +78,9 @@ class ChatCache:
                 return r[0]
             return None
 
+
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 
 def limit_async_func_call(max_size: int, waitting_time: float = 0.1):
     """Add restriction of maximum async calling times for a async func"""
@@ -98,7 +103,9 @@ def limit_async_func_call(max_size: int, waitting_time: float = 0.1):
 
     return final_decro
 
+
 class LLM:
+
     def __init__(self):
         """Initialize the LLM with the path of the configuration file."""
         self.cache = ChatCache()
@@ -117,17 +124,18 @@ class LLM:
     )
     @limit_async_func_call(16)
     async def chat_text(self,
-                   prompt: str,
-                   system_prompt=None,
-                   tools=[],
-                   enable_cache:bool=True) -> str:
-        if enable_cache:
+                        prompt: str,
+                        system_prompt=None,
+                        tools=[]) -> str:
+        """Chat with text response."""
+        llm_cache_enable = get_env_with_default('LLM_CACHE_ENABLE', False)
+        if llm_cache_enable:
             r = self.cache.get(query=prompt, backend=self.provider.model)
             if r is not None:
                 logger.info('LLM cache hit')
                 return r
 
-        # 计算 TPM，看是否需要等待        
+        # 计算 TPM，看是否需要等待
         input_tokens = encode_string(content=prompt)
         input_token_size = len(input_tokens)
         await self.tpm.wait(token_count=input_token_size)
@@ -138,15 +146,19 @@ class LLM:
 
         text_part = TextPart(text='')
         async for part in await self.provider.generate(
-            system_prompt=system_prompt,
-            tools=tools,
-            history=[Message(role="user", content=[TextPart(text=prompt)])],
+                system_prompt=system_prompt,
+                tools=tools,
+                history=[
+                    Message(role="user", content=[TextPart(text=prompt)])
+                ],
         ):
             text_part.merge_in_place(part)
-        
+
         content = text_part.text
-        self.cache.add(query=prompt, response=content, backend=self.provider.model)
-        
+        self.cache.add(query=prompt,
+                       response=content,
+                       backend=self.provider.model)
+
         content_token_size = len(encode_string(content=content))
 
         self.sum_input_token_size += input_token_size

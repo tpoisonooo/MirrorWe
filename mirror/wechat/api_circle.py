@@ -7,13 +7,15 @@ from .helper import async_post, daily_task_once
 from ..primitive.metaclass import SingletonMeta
 import time
 
+
 class APICircle(metaclass=SingletonMeta):
+
     def __init__(self):
-        # 朋友圈是高危工作，记录启动时间
+        # 朋友圈是高危动作，记录启动时间
         self.system_start_time = time.time()
         self.cookie = Cookie()
 
-    async def get_circle(self, wxid:str) -> Dict[str, Any]:
+    async def get_circle(self, wxid: str) -> Dict[str, Any]:
         """
         获取好友首页朋友圈 https://wkteam.cn/api-wen-dang2/peng-you-quan/getFriendCircle.html
         目前只实现首页。
@@ -28,17 +30,16 @@ class APICircle(metaclass=SingletonMeta):
             'firstPageMd5': "",
             'maxId': 0,
         }
-        
+
         json_obj, err = await async_post(
             url=f'http://{self.cookie.WKTEAM_IP_PORT}/getFriendCircle',
             data=data,
-            headers=headers
-        )
-        
+            headers=headers)
+
         if err is not None:
             logger.error(f'Failed to get circle: {err}')
             return {'sns': [], 'firstPageMd5': ''}
-        
+
         return json_obj.get('data', {'sns': [], 'firstPageMd5': ''})
 
     async def get_circle_detail(self, sns_id: str) -> Dict[str, Any]:
@@ -49,21 +50,17 @@ class APICircle(metaclass=SingletonMeta):
             'Content-Type': 'application/json',
             'Authorization': self.cookie.auth
         }
-        data = {
-            'wId': self.cookie.wId,
-            'id': sns_id
-        }
-        
+        data = {'wId': self.cookie.wId, 'id': sns_id}
+
         json_obj, err = await async_post(
             url=f'http://{self.cookie.WKTEAM_IP_PORT}/getSnsObject',
             data=data,
-            headers=headers
-        )
-        
+            headers=headers)
+
         if err is not None:
             logger.error(f'Failed to get circle detail: {err}')
             return {}
-        
+
         return json_obj.get('data', {})
 
     async def sns_praise(self, sns_id: str) -> Dict[str, Any]:
@@ -74,21 +71,17 @@ class APICircle(metaclass=SingletonMeta):
             'Content-Type': 'application/json',
             'Authorization': self.cookie.auth
         }
-        data = {
-            'wId': self.cookie.wId,
-            'id': sns_id
-        }
-        
+        data = {'wId': self.cookie.wId, 'id': sns_id}
+
         json_obj, err = await async_post(
             url=f'http://{self.cookie.WKTEAM_IP_PORT}/snsPraise',
             data=data,
-            headers=headers
-        )
-        
+            headers=headers)
+
         if err is not None:
             logger.error(f'Failed to get circle detail: {err}')
             return {}
-        
+
         return json_obj.get('data', {})
 
     async def sns_comment(self, sns_id: str, content: str) -> bool:
@@ -105,17 +98,16 @@ class APICircle(metaclass=SingletonMeta):
             "content": content,
             'id': sns_id
         }
-        
+
         json_obj, err = await async_post(
             url=f'http://{self.cookie.WKTEAM_IP_PORT}/snsComment',
             data=data,
-            headers=headers
-        )
-        
+            headers=headers)
+
         if err is not None:
             logger.error(f'Failed to comment on circle: {err}')
             return False
-        
+
         return True
 
     async def sns_praise_first_one(self, wxid: str):
@@ -130,7 +122,7 @@ class APICircle(metaclass=SingletonMeta):
             await self.sns_praise(sns_id)
         except Exception as e:
             logger.warning(f'No circle found')
-    
+
     async def sns_send(self, content: str) -> Dict[str, Any]:
         """
         发朋友圈 https://wkteam.cn/api-wen-dang2/peng-you-quan/snsSend.html
@@ -139,13 +131,14 @@ class APICircle(metaclass=SingletonMeta):
         """
 
         if time.time() - system_start_time < 3 * 24 * 3600:
-            logger.error('Must stay online for 3 days before posting to circle')
+            logger.error(
+                'Must stay online for 3 days before posting to circle')
             return {}
 
         success = daily_task_once()
         if not success:
             return {}
-       
+
         headers = {
             'Content-Type': 'application/json',
             'Authorization': self.cookie.auth
@@ -154,13 +147,12 @@ class APICircle(metaclass=SingletonMeta):
             'wId': self.cookie.wId,
             "content": content,
         }
-        
+
         json_obj, err = await async_post(
             url=f'http://{self.cookie.WKTEAM_IP_PORT}/snsSend',
             data=data,
-            headers=headers
-        )
-        
+            headers=headers)
+
         if err is not None:
             logger.error(f'Failed to send to circle: {err}')
             return {}

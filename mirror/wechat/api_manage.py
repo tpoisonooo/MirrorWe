@@ -10,13 +10,17 @@ import time
 
 system_start_time = time.time()
 
+
 class APIManage(metaclass=SingletonMeta):
+
     def __init__(self):
         self.cookie = Cookie()
 
     async def login(self):
         """user login, need scan qr code on mobile phone."""
-        raise Exception(f'{__file__} APIManage.login deprecated, please open http://121.229.29.88:6327/#/dashboard and manully login')
+        raise Exception(
+            f'{__file__} APIManage.login deprecated, please open http://121.229.29.88:6327/#/dashboard and manully login'
+        )
         # auth
         headers = {'Content-Type': 'application/json'}
         data = {
@@ -27,8 +31,7 @@ class APIManage(metaclass=SingletonMeta):
         json_obj, err = await async_post(
             url=f'http://{self.cookie.WKTEAM_IP_PORT}/member/login',
             data=data,
-            headers=headers
-        )
+            headers=headers)
 
         if err is not None:
             return err
@@ -41,8 +44,7 @@ class APIManage(metaclass=SingletonMeta):
         json_obj, err = await async_post(
             url=f'http://{self.cookie.WKTEAM_IP_PORT}/iPadLogin',
             data=data,
-            headers=headers
-        )
+            headers=headers)
 
         if err is not None:
             return err
@@ -51,12 +53,11 @@ class APIManage(metaclass=SingletonMeta):
         self.cookie.wId = x['wId']
 
         # getLoginInfo
-        data={'wId': self.cookie.wId}
+        data = {'wId': self.cookie.wId}
         json_obj, err = await async_post(
             url=f'http://{self.cookie.WKTEAM_IP_PORT}/getIPadLoginInfo',
             data=data,
-            headers=headers
-        )
+            headers=headers)
 
         x = json_obj['data']
         self.cookie.wcId = x['wcId']
@@ -69,10 +70,9 @@ class APIManage(metaclass=SingletonMeta):
                 'wcId': self.cookie.wcId,
             },
             indent=2,
-            ensure_ascii=False
-        )
+            ensure_ascii=False)
         await safe_write_text(self.cookie.license_path, json_str)
- 
+
     async def set_callback(self):
         # set callback url
         callback_ip = self.cookie.callback_ip
@@ -88,8 +88,7 @@ class APIManage(metaclass=SingletonMeta):
         json_obj, err = await async_post(
             url=f'http://{self.cookie.WKTEAM_IP_PORT}/setHttpCallbackUrl',
             data=data,
-            headers=headers
-        )
+            headers=headers)
 
         if err is not None:
             return err

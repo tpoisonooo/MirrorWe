@@ -5,6 +5,7 @@ import aiofiles
 import json
 import os
 
+
 class Message:
 
     def __init__(self):
@@ -31,7 +32,11 @@ class Message:
         self._type = ''
         self.BOT_NAME = 'MirrorWe'
 
-    def parse(self, wx_msg: dict, bot_wxid: str, auth:str='', wkteam_ip_port:str=''):
+    def parse(self,
+              wx_msg: dict,
+              bot_wxid: str,
+              auth: str = '',
+              wkteam_ip_port: str = ''):
         # str or int
         _type = wx_msg.get('messageType', '')
         parse_type = 'unknown'
@@ -56,14 +61,14 @@ class Message:
                 if len(elements) > 0:
                     value = elements[0].text
                 return value
-            
+
             displayname = search_key(xml_key='displayname')
             if displayname == self.BOT_NAME:
                 displayname = ''
             displaycontent = search_key(xml_key='content')
             content = f'{displayname}:{displaycontent}'
             to_user = search_key(xml_key='chatusr')
-            
+
             if to_user != bot_wxid:
                 parse_type = 'ref_for_others'
                 self.status = 'skip'
@@ -90,7 +95,7 @@ class Message:
             desc = search_key(xml_key='des')
             self.desc = desc
             self.thumb_url = search_key(xml_key='thumburl')
-            
+
             query = data.get('pushContent', '')
 
         elif _type in ['80006']:
@@ -112,10 +117,14 @@ class Message:
             query = data['content']
             parse_type = 'text'
 
+        elif _type in ['30001']:
+            # friend request
+            parse_type = 'friend_request'
+            query = data.get('content', '')
         elif type(_type) is int:
             logger.warning(wx_msg)
         else:
-            return Exception('Unknown msg type {}'.format(_type))
+            logger.warning(f'Unknown msg type {_type} with data {data}')
 
         query = query.encode('UTF-8', 'ignore').decode('UTF-8')
         if query.startswith(f'@{self.BOT_NAME}'):
@@ -150,7 +159,9 @@ class Message:
                 return True
         return False
 
-async def save_message_to_file(file_paths: Union[List[str],str], message: dict):
+
+async def save_message_to_file(file_paths: Union[List[str], str],
+                               message: dict):
     """保存消息到指定的jsonl文件"""
     if isinstance(file_paths, str):
         file_paths = [file_paths]

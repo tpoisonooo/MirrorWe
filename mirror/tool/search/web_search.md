@@ -1,0 +1,1 @@
+Use this tool to fetch up-to-date information from the web whenever the cached data may be stale or when you need real-time facts (news, prices, weather, etc.).

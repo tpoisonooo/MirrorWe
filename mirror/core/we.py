@@ -19,6 +19,7 @@ from ..primitive import try_load_text
 import weakref
 import atexit
 
+
 class WeFactory:
     """
     微信实体工厂类
@@ -29,7 +30,7 @@ class WeFactory:
     3. 提供LRU缓存机制，支持对象换入换出
     4. 同步消息数据到本地文件夹
     """
-    
+
     def __init__(self, max_cache_size: int = 128):
         """
         初始化工厂
@@ -38,11 +39,11 @@ class WeFactory:
             max_cache_size: LRU缓存的最大对象数量
         """
         self.max_cache_size = max_cache_size
-        
+
         # 使用weakref管理缓存对象，允许垃圾回收
         self._person_cache: Dict[str, weakref.ref] = {}
         self._group_cache: Dict[str, weakref.ref] = {}
-        
+
         # 统计信息
         self._cache_stats = {
             'person_hits': 0,
@@ -51,12 +52,12 @@ class WeFactory:
             'group_misses': 0,
             'evictions': 0
         }
-        
+
         # 注册清理函数
         atexit.register(self._cleanup_all)
-        
+
         logger.info(f"WeFactory 初始化完成，缓存大小: {max_cache_size}")
-    
+
     def _is_group_id(self, wxid: str) -> bool:
         """
         判断是否为群聊ID
@@ -68,13 +69,14 @@ class WeFactory:
             True如果是群聊ID（包含@符号）
         """
         return '@' in wxid and ('chatroom' in wxid or 'openim' in wxid)
-    
+
     def _get_data_dir(self) -> str:
         """获取数据目录路径"""
         current_file = os.path.abspath(__file__)
         return os.path.join(os.path.dirname(current_file), "..", "..", "data")
-    
-    def _ensure_entity_directory(self, entity_id: str, entity_type: str) -> str:
+
+    def _ensure_entity_directory(self, entity_id: str,
+                                 entity_type: str) -> str:
         """
         确保实体目录存在
         
@@ -89,8 +91,10 @@ class WeFactory:
         entity_dir = os.path.join(data_dir, entity_type, entity_id)
         os.makedirs(entity_dir, exist_ok=True)
         return entity_dir
-    
-    async def get_person_async(self, wxid: str, auto_create: bool = True) -> Optional[Person]:
+
+    async def get_person_async(self,
+                               wxid: str,
+                               auto_create: bool = True) -> Optional[Person]:
         """
         获取Person对象
         
@@ -112,29 +116,32 @@ class WeFactory:
             else:
                 # 对象已被垃圾回收，从缓存中移除
                 del self._person_cache[wxid]
-        
+
         self._cache_stats['person_misses'] += 1
-        
+
         # 检查缓存大小，如果需要则清理
         if len(self._person_cache) >= self.max_cache_size:
             await self._evict_oldest_person()
-        
+
         # 创建新的Person对象
         if auto_create:
             person = Person(wxid)
             await person.initialize()
             # 确保目录存在
             self._ensure_entity_directory(wxid, 'friends')
-            
+
             # 添加到缓存
-            self._person_cache[wxid] = weakref.ref(person, self._on_person_finalized)
-            
+            self._person_cache[wxid] = weakref.ref(person,
+                                                   self._on_person_finalized)
+
             # logger.info(f"创建新的Person对象: {wxid}")
             return person
-        
+
         return None
-    
-    async def get_group_async(self, group_id: str, auto_create: bool = True) -> Optional[Group]:
+
+    async def get_group_async(self,
+                              group_id: str,
+                              auto_create: bool = True) -> Optional[Group]:
         """
         获取Group对象
         
@@ -149,7 +156,7 @@ class WeFactory:
         if not self._is_group_id(group_id):
             logger.warning(f"无效的群聊ID格式: {group_id}")
             return None
-        
+
         # 检查缓存
         if group_id in self._group_cache:
             group_ref = self._group_cache[group_id]
@@ -161,29 +168,33 @@ class WeFactory:
             else:
                 # 对象已被垃圾回收，从缓存中移除
                 del self._group_cache[group_id]
-        
+
         self._cache_stats['group_misses'] += 1
-        
+
         # 检查缓存大小，如果需要则清理
         if len(self._group_cache) >= self.max_cache_size:
             await self._evict_oldest_group()
-        
+
         # 创建新的Group对象
         if auto_create:
             group = Group(group_id)
             await group.initialize()
             # 确保目录存在
             self._ensure_entity_directory(group_id, 'groups')
-            
+
             # 添加到缓存
-            self._group_cache[group_id] = weakref.ref(group, self._on_group_finalized)
-            
+            self._group_cache[group_id] = weakref.ref(group,
+                                                      self._on_group_finalized)
+
             logger.info(f"创建新的Group对象: {group_id}")
             return group
-        
+
         return None
-    
-    async def get_entity(self, wxid: str, auto_create: bool = True) -> Optional[Union[Person, Group]]:
+
+    async def get_entity(
+            self,
+            wxid: str,
+            auto_create: bool = True) -> Optional[Union[Person, Group]]:
         """
         智能获取实体对象，自动判断类型
         
@@ -198,7 +209,7 @@ class WeFactory:
             return await self.get_group(wxid, auto_create)
         else:
             return await self.get_person(wxid, auto_create)
-    
+
     def _on_person_finalized(self, weak_ref):
         """Person对象被垃圾回收时的回调"""
         # 找到并移除对应的缓存项
@@ -207,9 +218,9 @@ class WeFactory:
                 del self._person_cache[wxid]
                 logger.debug(f"Person对象被垃圾回收: {wxid}")
                 break
-        
+
         # Person对象通过atexit注册了自己的清理函数，这里不需要额外处理
-    
+
     def _on_group_finalized(self, weak_ref):
         """Group对象被垃圾回收时的回调"""
         # 找到并移除对应的缓存项
@@ -218,9 +229,9 @@ class WeFactory:
                 del self._group_cache[group_id]
                 logger.debug(f"Group对象被垃圾回收: {group_id}")
                 break
-        
+
         # Group对象通过atexit注册了自己的清理函数，这里不需要额外处理
-    
+
     async def _evict_oldest_person(self):
         """清理最老的Person对象"""
         if self._person_cache:
@@ -229,7 +240,7 @@ class WeFactory:
             del self._person_cache[wxid]
             self._cache_stats['evictions'] += 1
             # logger.info(f"清理Person缓存: {wxid}")
-    
+
     async def _evict_oldest_group(self):
         """清理最老的Group对象"""
         if self._group_cache:
@@ -238,7 +249,7 @@ class WeFactory:
             del self._group_cache[group_id]
             self._cache_stats['evictions'] += 1
             logger.info(f"清理Group缓存: {group_id}")
-    
+
     async def _sync_entity_data(self, entity: Union[Person, Group]) -> None:
         """
         同步实体数据到磁盘
@@ -250,26 +261,32 @@ class WeFactory:
             if isinstance(entity, Person):
                 # 同步Person的内存数据
                 if hasattr(entity, 'memory') and entity.memory.group:
-                    group_file = os.path.join(entity.wxid_dir, "group_segment.jsonl")
-                    await dump_multi_inner_async(group_file, entity.memory.group)
-                
+                    group_file = os.path.join(entity.wxid_dir,
+                                              "group_segment.jsonl")
+                    await dump_multi_inner_async(group_file,
+                                                 entity.memory.group)
+
                 if hasattr(entity, 'memory') and entity.memory.private:
-                    private_file = os.path.join(entity.wxid_dir, "message.jsonl") 
-                    await dump_multi_inner_async(private_file, entity.memory.private)
-                    
+                    private_file = os.path.join(entity.wxid_dir,
+                                                "message.jsonl")
+                    await dump_multi_inner_async(private_file,
+                                                 entity.memory.private)
+
             elif isinstance(entity, Group):
                 # 同步Group的内存数据
                 if hasattr(entity, 'memory') and entity.memory.group:
-                    group_file = os.path.join(entity.group_dir, "message.jsonl")
-                    await dump_multi_inner_async(group_file, entity.memory.group)
-            
-            logger.debug(f"同步实体数据完成: {entity.wxid if hasattr(entity, 'wxid') else entity.group_id}")
-            
+                    group_file = os.path.join(entity.group_dir,
+                                              "message.jsonl")
+                    await dump_multi_inner_async(group_file,
+                                                 entity.memory.group)
+
+            logger.debug(
+                f"同步实体数据完成: {entity.wxid if hasattr(entity, 'wxid') else entity.group_id}"
+            )
+
         except Exception as e:
             logger.error(f"同步实体数据失败: {e}")
-    
 
-    
     def get_cache_stats(self) -> Dict[str, Any]:
         """获取缓存统计信息"""
         return {
@@ -279,7 +296,7 @@ class WeFactory:
             'max_cache_size': self.max_cache_size,
             **self._cache_stats
         }
-    
+
     async def cleanup(self) -> None:
         """清理工厂资源"""
         logger.info("正在清理WeFactory资源...")
@@ -287,7 +304,7 @@ class WeFactory:
         self._person_cache.clear()
         self._group_cache.clear()
         logger.info("WeFactory清理完成")
-    
+
     def _cleanup_all(self):
         """程序退出时的清理函数"""
         # Person和Group对象已经通过atexit注册了自己的清理函数
@@ -329,7 +346,8 @@ def get_person_sync(wxid: str, max_cache_size: int = 100) -> Optional[Person]:
     return loop.run_until_complete(factory.get_person(wxid))
 
 
-def get_group_sync(group_id: str, max_cache_size: int = 100) -> Optional[Group]:
+def get_group_sync(group_id: str,
+                   max_cache_size: int = 100) -> Optional[Group]:
     """同步获取Group对象"""
     factory = get_factory(max_cache_size)
     try:
@@ -340,7 +358,9 @@ def get_group_sync(group_id: str, max_cache_size: int = 100) -> Optional[Group]:
     return loop.run_until_complete(factory.get_group(group_id))
 
 
-def get_entity_sync(wxid: str, max_cache_size: int = 100) -> Optional[Union[Person, Group]]:
+def get_entity_sync(
+        wxid: str,
+        max_cache_size: int = 100) -> Optional[Union[Person, Group]]:
     """同步获取实体对象（自动判断类型）"""
     factory = get_factory(max_cache_size)
     try:

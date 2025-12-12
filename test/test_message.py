@@ -15,6 +15,7 @@ sys.path.insert(0, str(project_root))
 # 现在可以顺利导入
 from mirror import APIMessage  # 通过包的 __init__.py 导入
 
+
 async def test_revert_all():
     """测试发送一条消息，3s后撤回"""
     api_message = APIMessage()
@@ -22,16 +23,18 @@ async def test_revert_all():
     await asyncio.sleep(3)
     await api_message.revert_all()
 
+
 async def main():
     """主测试函数"""
     print("=== 消息API测试开始 ===\n")
-    
+
     # 运行测试
     test_results = []
-    
+
     print("\n1. 撤回所有消息:")
     test_results.append(await test_revert_all())
-    
+
+
 if __name__ == '__main__':
     # 运行测试
     success = asyncio.run(main())

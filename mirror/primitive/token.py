@@ -3,6 +3,7 @@ import re
 
 ENCODER = None
 
+
 # modified from https://github.com/HKUDS/LightRAG
 def encode_string(content: str, model_name: str = "gpt-4o"):
     global ENCODER

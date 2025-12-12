@@ -1,9 +1,11 @@
 import sqlite3
 
+
 class DB:
+
     def __init__(self, filename):
         self.filename = filename
-        
+
     def __enter__(self):
         self.conn = sqlite3.connect(self.filename)
         self.cursor = self.conn.cursor()
