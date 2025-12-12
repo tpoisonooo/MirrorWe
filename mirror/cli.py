@@ -304,27 +304,27 @@ async def init_friends_groups_basic():
 async def main():
     """Parse args."""
     parser = argparse.ArgumentParser(description='wechat server.')
-    parser.add_argument('--login',
-                        action='store_true',
-                        default=False,
-                        help='Step1 Login wkteam')
+    # parser.add_argument('--login',
+    #                     action='store_true',
+    #                     default=False,
+    #                     help='Step1 Login wkteam, deprecated.')
 
     parser.add_argument(
         '--basic',
         action='store_true',
         default=False,
-        help='Step2 Fetch friends and groups basic information')
+        help='Step1 Fetch friends and groups basic information')
 
     parser.add_argument(
         '--serve',
         action='store_true',
         default=False,
-        help='Step3.1 Bind port and listen WeChat message callback')
+        help='Step2.1 Bind port and listen WeChat message callback')
 
     parser.add_argument('--forward',
                         action='store_true',
                         default=False,
-                        help='Step3.2 Forward all message to all groups')
+                        help='Step2.2 Forward all message to all groups')
 
     parser.add_argument('--life',
                         type=int,
@@ -347,9 +347,9 @@ async def main():
     manager = WkteamManager()
     manager.setup(args)
 
-    if args.login:
-        await manager.api_manage.login()
-        await manager.api_manage.set_callback()
+    # if args.login:
+    #     await manager.api_manage.login()
+    #     await manager.api_manage.set_callback()
 
     if args.basic:
         await init_friends_groups_basic()

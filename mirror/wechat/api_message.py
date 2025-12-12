@@ -48,6 +48,7 @@ class APIMessage(metaclass=SingletonMeta):
             # 查找（）内的东西，删掉
             text = remove_parentheses(text)
         sleep_time = len(text) / 40 * 60
+        logger.info(f"Sleeping {sleep_time} second for input length: {len(text)}")
         await asyncio.sleep(sleep_time)
         return text
 

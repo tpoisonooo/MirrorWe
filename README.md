@@ -1,39 +1,73 @@
-# MirrorWe
+## 🏹 MirrorWe
+<div>
+<a href="https://cdn.vansin.top/internlm/dou.jpg" target="_blank">
+<img alt="Wechat" src="https://img.shields.io/badge/wechat-bot%20inside-brightgreen?logo=wechat&logoColor=white" />
+</a>
+<a href="https://youtu.be/2lDYDXifWMs" target="_blank">
+<img alt="YouTube" src="https://img.shields.io/badge/YouTube-black?logo=youtube&logoColor=red" />
+</a>
+</div>
 
-把微信彻底交给 AI：
-- 搜索联系人、写下人物传记
-- 私聊群聊消息收发；跨群转发文字、图片、表情包、链接
+把个人微信彻底交给 AI：
+- 私聊群聊消息收发；转发文字、图片、表情包、链接
+- 搜索联系人、写下人物传记（[样例](./resource/example_bio.md)）
 - 自动发朋友圈，点赞评论
 
-搜索微信用户 **MirrorWe**（区分大小写）体验效果，行为见 [人物传记](./mirror/actor/doll.md)。
+## 🖼️ 运行效果
+
+**任务执行** 例如让 AI 想办法找到某人，并发送他可能感兴趣的消息
+    <details>
+    <summary>点击查看视频</summary>
+    <video src="https://github.com/user-attachments/assets/88486917-1243-42c7-8ed6-c5e6a4d81857" controls></video>
+    </details>
+
+**自动托管** 搜索微信用户 **MirrorWe** ，设定见 [人物小传](./mirror/actor/doll.md)。
+    <details>
+    <summary>点击查看回复</summary>
+    <img width="675" height="444" alt="Image" src="https://github.com/user-attachments/assets/729a5701-9583-4aa1-af07-5874e84a094e" controls></img>
+    </details>
 
 ## 🚀 运行
 
 环境要求：
 - 公网 IP。用于消息接收，推荐云服务
-- iOS 环境。[wkteam](http://121.229.29.88:6327) 登录账号需要
+- iphone 或 ipad。[wkteam](http://121.229.29.88:6327) 人脸实名登录需要
 
 **STEP1** 注册登录 wkteam
 
-本项目使用 .env 配置环境变量：
+1. 先在 **“管理&账号-微信管理”** 手动完成登录，复制 wid 和 wcid
+2. 再在 **“在线测试-登录平台（第一步）”** 执行一次 api，复制 AUTH
 
-功能：
+**STEP2** 配置 .env 环境变量，运行
 
-- wechat/proxy.py 代理。做 wechat 登录、跨群消息转发、接收消息分类
-- wechat/reorganize.py 处理历史保存的消息。过去的消息也没分类，只存到了单个 .jsonl
+```bash
+cp .env_example .env
+```
 
-## 致谢
+填写 `.env` 中需要的参数，然后执行：
+
+- `uv run -m mirror.cli --help` 。初始化通讯录、收发群聊私聊消息、跨群消息转发
+- `uv run -m mirror.main` 输入命令，让 AI 在微信中思考执行（需要先运行几天 `mirror.cli`）
+
+
+## 🔗 致谢和引用
 - [ncnn contributors](https://github.com/tencent/ncnn) 提供验证环境
-- [kosong](https://github.com/MoonshotAI/kosong) 工具调用封装
-- [HuixiangDou2](https://github.com/tpoisonooo/HuixiangDou2) primitive 封装
-- [HuixiangDou](https://github.com/internlm/huixiangdou) 微信接入方法
+- [kosong](https://github.com/MoonshotAI/kosong) 封装设计
+- [HuixiangDou2](https://github.com/tpoisonooo/HuixiangDou2) primitive 脚手架
+- [HuixiangDou](https://github.com/internlm/huixiangdou) 微信接入调研
 
-## 开发随感
-- 20251211 性格是啥？对事件的应对。抛开初始条件看的话，性格其实是经历本身、是路径依赖、是手里已经有的牌。如果直接 assign bot 一个什么设定，在不同事件面前反应相同，会很不自然。
-- 20251211 朋友圈是高危区域，啊被封了
-- 20251209 做成通用框架，还是纯应用向？以 MirrorDoll 吸引用户，repo 还是通用路线
-- 20251130 观察到微信群复读导致 modeling 出现偏差。例如某人消息里太多“白座”，会认为这个群友是白座。已修复。
-- 20251129 想方便可视化 jsonl@indent=2，又期望高性能用 pyarrow，难兼顾。
-- 20251123 用 coding 的方式动态 modeling 群友。实现后又不知道有啥实际作用。只能先放进 experimental
+如果您需要引用本项目，请参考：
 
-## [GPL license](./LICENSE)
+```text
+@misc{mirrorwe2025,
+  author = {tpoisonooo},
+  title = {MirrorWe},
+  year = {2025},
+  publisher = {GitHub},
+  howpublished = {\url{https://github.com/tpoisonooo/MirrorWe}},
+  note = {Accessed: 2025-12-12}
+}
+```
+
+## 📜 License
+本项目遵循 [GPL license](./LICENSE)，不可用于商业行为。
