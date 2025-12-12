@@ -8,6 +8,7 @@ from loguru import logger
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
+
 def time_string() -> str:
     # 创建东八区时区对象
     tz = timezone(timedelta(hours=8))
@@ -18,6 +19,7 @@ def time_string() -> str:
     # 格式化输出
     return now.strftime("当前时间：%Y年%m月%d日 %H时%M分")
 
+
 def load_desc(path: Path, substitutions: dict[str, str] | None = None) -> str:
     """Load a tool description from a file, with optional substitutions."""
     description = path.read_text(encoding="utf-8")
@@ -25,21 +27,23 @@ def load_desc(path: Path, substitutions: dict[str, str] | None = None) -> str:
         description = string.Template(description).substitute(substitutions)
     return description
 
-async def safe_write_text(file_path: str, content: str) -> bool:                                                                   
-    try:                                                                                                                              
-        async with aiofiles.open(file_path, 'w', encoding='utf-8') as f:                                                              
-            await f.write(content)                                                                                                    
-        return True                                                                                                                   
-    except Exception as e:                                                                                                            
-        logger.error(f"写入文件失败 {file_path}: {e}")                                                                                
+
+async def safe_write_text(file_path: str, content: str) -> bool:
+    try:
+        async with aiofiles.open(file_path, 'w', encoding='utf-8') as f:
+            await f.write(content)
+        return True
+    except Exception as e:
+        logger.error(f"写入文件失败 {file_path}: {e}")
         return False
 
-async def try_load_text(path:str, default:str='') -> str:
+
+async def try_load_text(path: str, default: str = '') -> str:
     text = ''
-    
+
     if not os.path.exists(path):
         return default
-    
+
     try:
         async with aiofiles.open(path, mode='r', encoding='utf-8') as f:
             text = await f.read()
@@ -47,6 +51,7 @@ async def try_load_text(path:str, default:str='') -> str:
     except Exception as e:
         logger.error(f"Read {path} failed: {e}")
     return text
+
 
 def always_get_an_event_loop():
     """
@@ -77,7 +82,7 @@ def get_env_with_default(key: str, default: any) -> any:
     value = os.getenv(key)
     if value is None:
         return default
-    
+
     # Try to convert to appropriate type
     if isinstance(default, int):
         try:

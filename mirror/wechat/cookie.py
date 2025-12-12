@@ -5,7 +5,10 @@ import json
 from loguru import logger
 
 load_dotenv()
+
+
 class Cookie:
+
     def __init__(self):
         self.WKTEAM_IP_PORT = '121.229.29.88:9899'
         self.auth = get_env_or_raise('WKTEAM_AUTH')

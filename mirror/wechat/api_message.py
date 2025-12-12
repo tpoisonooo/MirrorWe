@@ -13,32 +13,35 @@ import aiofiles
 import re
 import asyncio
 
+
 def remove_parentheses(s):
     """移除字符串中的小括号及其包含的内容"""
     pairs = [('(', ')'), ('（', '）')]
-    
+
     for left_paren, right_paren in pairs:
         while True:
             # 找到第一个右括号
             right = s.find(right_paren)
             if right == -1:
                 break
-            
+
             # 在右括号左侧找对应的左括号
             left = s.rfind(left_paren, 0, right)
             if left == -1:
                 break
-            
+
             # 移除括号及其内容
             s = s[:left] + s[right + 1:]
     return s
 
+
 class APIMessage(metaclass=SingletonMeta):
+
     def __init__(self):
         self.cookie = Cookie()
         self.sent_msg = {}
-        
-    async def magic_text(self, text:str):
+
+    async def magic_text(self, text: str):
         model = get_env_or_raise("KIMI_MODEL_NAME")
         if 'qwen3-30b-a3b-instruct-2507' in model:
             # 过滤掉不像人类的部分
@@ -56,7 +59,9 @@ class APIMessage(metaclass=SingletonMeta):
         data = {'wId': self.cookie.wId, 'wcId': group_id, 'content': image_url}
 
         json_obj, err = await async_post(url='http://{}/sendImage2'.format(
-            self.cookie.WKTEAM_IP_PORT), data=data, headers=headers)
+            self.cookie.WKTEAM_IP_PORT),
+                                         data=data,
+                                         headers=headers)
         if err is not None:
             return err
 
@@ -74,10 +79,17 @@ class APIMessage(metaclass=SingletonMeta):
             'Content-Type': 'application/json',
             'Authorization': self.cookie.auth
         }
-        data = {'wId': self.cookie.wId, 'wcId': group_id, 'imageMd5': md5, 'imgSize': length}
+        data = {
+            'wId': self.cookie.wId,
+            'wcId': group_id,
+            'imageMd5': md5,
+            'imgSize': length
+        }
 
         json_obj, err = await async_post(url='http://{}/sendEmoji'.format(
-            self.cookie.WKTEAM_IP_PORT), data=data, headers=headers)
+            self.cookie.WKTEAM_IP_PORT),
+                                         data=data,
+                                         headers=headers)
         if err is not None:
             return err
 
@@ -92,7 +104,7 @@ class APIMessage(metaclass=SingletonMeta):
 
     async def send_group_text(self, group_id: str, text: str):
         text = await self.magic_text(text)
-        
+
         headers = {
             'Content-Type': 'application/json',
             'Authorization': self.cookie.auth
@@ -101,8 +113,8 @@ class APIMessage(metaclass=SingletonMeta):
 
         json_obj, err = await async_post(url='http://{}/sendText'.format(
             self.cookie.WKTEAM_IP_PORT),
-                                  data=data,
-                                  headers=headers)
+                                         data=data,
+                                         headers=headers)
         if err is not None:
             return err
 
@@ -125,8 +137,8 @@ class APIMessage(metaclass=SingletonMeta):
 
         json_obj, err = await async_post(url='http://{}/sendText'.format(
             self.cookie.WKTEAM_IP_PORT),
-                                  data=data,
-                                  headers=headers)
+                                         data=data,
+                                         headers=headers)
         if err is not None:
             return err
 
@@ -139,17 +151,25 @@ class APIMessage(metaclass=SingletonMeta):
 
         return None
 
-    async def send_group_url(self, group_id: str, description: str, title: str, thumb_url: str, url: str):
+    async def send_group_url(self, group_id: str, description: str, title: str,
+                             thumb_url: str, url: str):
         headers = {
             'Content-Type': 'application/json',
             'Authorization': self.cookie.auth
         }
-        data = {'wId': self.cookie.wId, 'wcId': group_id, 'description': description, 'title':title, 'thumbUrl':thumb_url, 'url':url}
+        data = {
+            'wId': self.cookie.wId,
+            'wcId': group_id,
+            'description': description,
+            'title': title,
+            'thumbUrl': thumb_url,
+            'url': url
+        }
 
         json_obj, err = await async_post(url='http://{}/sendUrl'.format(
             self.cookie.WKTEAM_IP_PORT),
-                                  data=data,
-                                  headers=headers)
+                                         data=data,
+                                         headers=headers)
         if err is not None:
             return err
 
@@ -181,8 +201,10 @@ class APIMessage(metaclass=SingletonMeta):
                         'Authorization': self.cookie.auth
                     }
 
-                    try: 
-                        _, err = await async_post(url='http://{}/revokeMsg'.format(self.cookie.WKTEAM_IP_PORT),
+                    try:
+                        _, err = await async_post(
+                            url='http://{}/revokeMsg'.format(
+                                self.cookie.WKTEAM_IP_PORT),
                             data=sent,
                             headers=headers)
                     except Exception as e:
@@ -191,7 +213,9 @@ class APIMessage(metaclass=SingletonMeta):
                         await asyncio.sleep(1)
         self.sent_msg = {}
 
-    async def download_image(self, param: dict, data_dir: str) -> Tuple[Optional[str], Optional[str]]:
+    async def download_image(
+            self, param: dict,
+            data_dir: str) -> Tuple[Optional[str], Optional[str]]:
         """Download group chat image."""
         content = param['content']
         msgId = param['msgId']
@@ -217,8 +241,8 @@ class APIMessage(metaclass=SingletonMeta):
             # Get image URL from WKTeam API
             json_obj, err = await async_post('http://{}/getMsgImg'.format(
                 self.cookie.WKTEAM_IP_PORT),
-                                     data=data,
-                                     headers=headers)
+                                             data=data,
+                                             headers=headers)
             if err is not None:
                 logger.error(f'Failed to get image URL: {err}')
                 return None, None
@@ -228,7 +252,7 @@ class APIMessage(metaclass=SingletonMeta):
                 return None, None
 
             image_url = json_obj['data']['url']
-            
+
             # Download image to local
             logger.info('image url {}'.format(image_url))
             async with aiohttp.ClientSession() as session:
@@ -240,16 +264,18 @@ class APIMessage(metaclass=SingletonMeta):
                         image_path = os.path.join(
                             image_dir, generate_hash_filename(data=data))
                         logger.debug('local path {}'.format(image_path))
-                        
-                        async with aiofiles.open(image_path, 'wb') as image_file:
+
+                        async with aiofiles.open(image_path,
+                                                 'wb') as image_file:
                             async for chunk in resp.content.iter_chunked(1024):
                                 await image_file.write(chunk)
-                        
+
                         return image_url, image_path
                     else:
-                        logger.error(f'Failed to download image: {resp.status}')
+                        logger.error(
+                            f'Failed to download image: {resp.status}')
                         return None, None
-                        
+
         except Exception as e:
             logger.error(str(e))
             return None, None

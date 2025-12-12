@@ -1,4 +1,5 @@
 class Personality:
+
     def __init__(self):
         self.mbti = "UNKNOWN"
         self.bigfive = {"O": 0.5, "C": 0.5, "E": 0.5, "A": 0.5, "N": 0.5}

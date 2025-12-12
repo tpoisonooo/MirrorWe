@@ -18,11 +18,14 @@ from mirror.tool.contact import ListGroup, ListGroupParams
 from mirror.tool.contact import GroupChatFriend, GroupChatFriendParams
 from mirror.tool.search import WebSearch, WebSearchParams
 
+
 async def main():
     print("=== 工具测试开始 ===\n")
 
     web_search_result = await WebSearch()(WebSearchParams(query="今天上海多少度？"))
     print(web_search_result)
+
+
 if __name__ == '__main__':
     # 运行测试
     success = asyncio.run(main())

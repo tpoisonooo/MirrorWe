@@ -4,16 +4,20 @@ from .wechat import Message
 from .wechat.cookie import Cookie
 from typing import List
 
+
 async def from_origin(filepaths: List[str]):
     factory = get_factory()
     cookie = Cookie()
     for filepath in filepaths:
         async for wx_msg in parse_multi_inner_async(filepath, output='json'):
             msg = Message()
-            err = msg.parse(wx_msg=wx_msg, bot_wxid=cookie.wcId, auth=cookie.auth, wkteam_ip_port=cookie.WKTEAM_IP_PORT)
+            err = msg.parse(wx_msg=wx_msg,
+                            bot_wxid=cookie.wcId,
+                            auth=cookie.auth,
+                            wkteam_ip_port=cookie.WKTEAM_IP_PORT)
             if err is not None:
                 continue
-            
+
             match msg._type:
                 case '80001':
                     p = await factory.get_person_async(wxid=msg.sender_id)
@@ -24,6 +28,7 @@ async def from_origin(filepaths: List[str]):
                 case '60001':
                     p = await factory.get_person_async(wxid=msg.sender_id)
                     await p.update(wk_msg=msg)
+
 
 if __name__ == "__main__":
     import asyncio

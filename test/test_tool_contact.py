@@ -17,14 +17,17 @@ from mirror.tool.contact import ListPrivateFriend, ListPrivateFriendParams
 from mirror.tool.contact import ListGroup, ListGroupParams
 from mirror.tool.contact import GroupChatFriend, GroupChatFriendParams
 
+
 async def main():
     print("=== 工具测试开始 ===\n")
 
-    private_friend_result = await ListPrivateFriend()(ListPrivateFriendParams())
+    private_friend_result = await ListPrivateFriend()(
+        ListPrivateFriendParams())
 
     group_result = await ListGroup()(ListGroupParams())
 
     friend_in_group_result = await GroupChatFriend()(GroupChatFriendParams())
+
 
 if __name__ == '__main__':
     # 运行测试

@@ -16,7 +16,10 @@ from kosong.chat_provider.kimi import Kimi
 
 from .actor.helper import build_toolset
 import asyncio
+
 load_dotenv()
+
+
 async def agent_loop(chat_provider: ChatProvider, toolset: Toolset):
     system_prompt = "You are a helpful assistant."
     history: list[Message] = []
@@ -29,7 +32,7 @@ async def agent_loop(chat_provider: ChatProvider, toolset: Toolset):
             break
 
         history.append(Message(role="user", content=user_input))
-        
+
         step = 0
         max_step_size = 20
         while step < max_step_size:
@@ -67,6 +70,7 @@ def tool_result_to_message(result: ToolResult) -> Message:
         content=result.return_value.output,
     )
 
+
 async def main():
     provider = 'kimi'
     provider_upper = provider.upper()
@@ -83,5 +87,6 @@ async def main():
     toolset = build_toolset()
     # 找到 🎈 的联系方式，想办法给他发条消息。内容随意，写个她可能感兴趣会回复的话题。 或者告诉她 “你老公一会儿下班”
     await agent_loop(chat_provider, toolset)
+
 
 asyncio.run(main())

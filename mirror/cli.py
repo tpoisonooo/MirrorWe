@@ -41,6 +41,7 @@ from .core.we import get_factory
 from .primitive import LLM, get_env_or_raise, always_get_an_event_loop
 from .prompt import SUMMARY_BIO
 
+
 class WkteamManager:
     """
     1. wkteam Login, see http://121.229.29.88:6327/
@@ -61,7 +62,7 @@ class WkteamManager:
         self.actor = None
         self.act_group_id = None
         self.factory = get_factory()
-    
+
     def setup(self, args):
         match args.actor:
             case 'doll':
@@ -69,11 +70,13 @@ class WkteamManager:
                 self.actor = Doll()
         self.act_group_id = args.act_group_id
 
-    async def bind(self, forward:bool=False, life:int=3600*7*30*12):
+    async def bind(self,
+                   forward: bool = False,
+                   life: int = 3600 * 7 * 30 * 12):
         logdir = self.cookie.data_dir
         port = self.cookie.callback_port
         os.makedirs(logdir, exist_ok=True)
-        
+
         async def forward_to_groups(msg: Message):
             """跨群转发"""
             if msg.new_msg_id in self.preprocessed:
@@ -81,7 +84,7 @@ class WkteamManager:
                 print(f'{msg.new_msg_id} repeated, skip')
                 return
             self.preprocessed.add(msg.new_msg_id)
-            
+
             # 不是白名单群里的消息，不转发
             come_from_whitelist = False
             for group_id, groupname in self.cookie.group_whitelist.items():
@@ -95,7 +98,7 @@ class WkteamManager:
             if msg.is_self:
                 # self message, skip
                 return
-            
+
             for group_id, _ in self.cookie.group_whitelist.items():
                 # 开始循环转发，每次睡眠一会儿
                 if group_id == msg.group_id:
@@ -108,31 +111,47 @@ class WkteamManager:
                     case 'text':
                         username = msg.push_content.split(':')[0].strip()
                         formatted_reply = '{}：{}'.format(username, msg.content)
-                        await self.api_message.send_group_text(group_id=group_id, text=formatted_reply)
+                        await self.api_message.send_group_text(
+                            group_id=group_id, text=formatted_reply)
 
                     case 'image':
                         # For forwarding images, we need to download first then upload
                         if msg.url:
-                            await self.api_message.send_group_image(group_id=group_id, image_url=msg.url)
+                            await self.api_message.send_group_image(
+                                group_id=group_id, image_url=msg.url)
                         else:
                             # Download image first using stored image data
-                            param = {'wId': self.cookie.wId, 'content': msg.image_content, 'msgId': msg.image_msg_id}
-                            image_url, _ = await self.api_message.download_image(param, self.cookie.data_dir)
+                            param = {
+                                'wId': self.cookie.wId,
+                                'content': msg.image_content,
+                                'msgId': msg.image_msg_id
+                            }
+                            image_url, _ = await self.api_message.download_image(
+                                param, self.cookie.data_dir)
 
                             if image_url:
-                                await self.api_message.send_group_image(group_id=group_id, image_url=image_url)
-                    
+                                await self.api_message.send_group_image(
+                                    group_id=group_id, image_url=image_url)
+
                     case 'emoji':
-                        await self.api_message.send_group_emoji(group_id=group_id, md5=msg.md5, length=msg.length)
-                    
+                        await self.api_message.send_group_emoji(
+                            group_id=group_id, md5=msg.md5, length=msg.length)
+
                     case 'ref_for_others' | 'ref_for_bot':
-                        formatted_reply = '{0}\n---\n{1}'.format(msg.content, msg.query)
-                        await self.api_message.send_group_text(group_id=group_id, text=formatted_reply)
-                
+                        formatted_reply = '{0}\n---\n{1}'.format(
+                            msg.content, msg.query)
+                        await self.api_message.send_group_text(
+                            group_id=group_id, text=formatted_reply)
+
                     case 'link':
                         thumbnail = msg.thumb_url if msg.thumb_url else 'https://deploee.oss-cn-shanghai.aliyuncs.com/icon.jpg'
-                        await self.api_message.send_group_url(group_id=group_id, description=msg.desc, title=msg.title, thumb_url=thumbnail, url=msg.url)
-                    
+                        await self.api_message.send_group_url(
+                            group_id=group_id,
+                            description=msg.desc,
+                            title=msg.title,
+                            thumb_url=thumbnail,
+                            url=msg.url)
+
                 await asyncio.sleep(random.uniform(0.5, 2.0))
 
         async def msg_callback(request):
@@ -147,7 +166,10 @@ class WkteamManager:
 
             # 2. 根据消息类型分别记录到对应的文件
             msg = Message()
-            err = msg.parse(wx_msg=input_json, bot_wxid=self.cookie.wcId, auth=self.cookie.auth, wkteam_ip_port=self.cookie.WKTEAM_IP_PORT)
+            err = msg.parse(wx_msg=input_json,
+                            bot_wxid=self.cookie.wcId,
+                            auth=self.cookie.auth,
+                            wkteam_ip_port=self.cookie.WKTEAM_IP_PORT)
             if err is not None:
                 logger.error(str(err))
                 return web.json_response(text=str(err))
@@ -156,7 +178,6 @@ class WkteamManager:
                 text = 'Neither sender_id nor group_id available.'
                 logger.warning(text)
                 return web.json_response(text=text)
-
 
             # 3. 是否需要撤回
             if msg.need_revert():
@@ -171,7 +192,10 @@ class WkteamManager:
                 # 4. 自动同意所有好友添加，不再交给 agent 处理
                 await asyncio.sleep(random.uniform(1, 4))
                 await self.api_contact.parse_and_accept(input_json)
-                await self.api_circle.sns_praise_first_one(input_json.get('data', {'fromUser':''}).get('fromUser', ''))
+                await self.api_circle.sns_praise_first_one(
+                    input_json.get('data', {
+                        'fromUser': ''
+                    }).get('fromUser', ''))
                 return web.json_response(text='accept user')
 
             elif msg._type.startswith('6'):
@@ -188,7 +212,7 @@ class WkteamManager:
                 await p.update(wk_msg=msg)
                 g = await self.factory.get_group_async(group_id=msg.group_id)
                 await g.update(wk_msg=msg)
-                
+
                 # 如果是配置的 act_group_id，则触发群内处理
                 if self.actor and self.act_group_id in msg.group_id:
                     await self.actor.agent_loop_group(g, p)
@@ -198,21 +222,20 @@ class WkteamManager:
                 await forward_to_groups(msg)
 
             return web.json_response(text='done')
-            
 
         # async bind，手动管理生命周期
         app = web.Application()
         app.add_routes([web.post('/callback', msg_callback)])
-        
+
         runner = web.AppRunner(app)
         await runner.setup()
         site = web.TCPSite(runner, '0.0.0.0', port)
         logger.info(f'Start async bind 0.0.0.0:{port}..')
         await site.start()
-        
+
         # 继续执行其他任务
         await asyncio.sleep(3600 * 24 * 30)
-        
+
         # 清理
         await runner.cleanup()
 
@@ -242,11 +265,14 @@ async def init_basic(api_contact, targets: List[str], _type: str) -> None:
                 os.makedirs(wxid_dir, exist_ok=True)
 
                 basic_path = os.path.join(wxid_dir, 'basic.json')
-                await safe_write_text(basic_path, json.dumps(contact, indent=2, ensure_ascii=False))
+                await safe_write_text(
+                    basic_path,
+                    json.dumps(contact, indent=2, ensure_ascii=False))
 
         except Exception as e:
             logger.error(f"处理联系人批次失败: {e}")
             continue
+
 
 async def init_friends_groups_basic():
     api_contact = APIContact()
@@ -260,20 +286,20 @@ async def init_friends_groups_basic():
         friends = []
     if not groups:
         groups = []
-    
+
     logger.info(f"Found {len(friends)} friends and {len(groups)} groups")
-    
+
     # Process friends
     if friends:
         logger.info("Processing friends...")
         await init_basic(api_contact, friends, 'friends')
-    
+
     # Process groups
     if groups:
         logger.info("Processing groups...")
         await init_basic(api_contact, groups, 'groups')
     logger.info("Profile basic completed")
-    
+
 
 async def main():
     """Parse args."""
@@ -283,15 +309,17 @@ async def main():
                         default=False,
                         help='Step1 Login wkteam')
 
-    parser.add_argument('--basic', 
-                        action='store_true',
-                        default=False,
-                        help='Step2 Fetch friends and groups basic information')
+    parser.add_argument(
+        '--basic',
+        action='store_true',
+        default=False,
+        help='Step2 Fetch friends and groups basic information')
 
-    parser.add_argument('--serve',
-                        action='store_true',
-                        default=False,
-                        help='Step3.1 Bind port and listen WeChat message callback')
+    parser.add_argument(
+        '--serve',
+        action='store_true',
+        default=False,
+        help='Step3.1 Bind port and listen WeChat message callback')
 
     parser.add_argument('--forward',
                         action='store_true',
@@ -300,18 +328,19 @@ async def main():
 
     parser.add_argument('--life',
                         type=int,
-                        default=3600*24*30*12,
+                        default=3600 * 24 * 30 * 12,
                         help='Seconds the server survive')
-    
+
     parser.add_argument('--actor',
                         type=str,
                         default='doll',
                         help='Actor to response private chat, default: doll')
 
-    parser.add_argument('--act_group_id',
-                        type=str,
-                        default=None,
-                        help='Group ID to activate actor responses within the group')
+    parser.add_argument(
+        '--act_group_id',
+        type=str,
+        default=None,
+        help='Group ID to activate actor responses within the group')
 
     args = parser.parse_args()
 
@@ -328,6 +357,7 @@ async def main():
     if args.serve:
         await manager.bind(args.forward, args.life)
         await manager.api_manage.set_callback()
+
 
 if __name__ == '__main__':
     loop = always_get_an_event_loop()

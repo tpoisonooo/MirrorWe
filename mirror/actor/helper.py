@@ -14,6 +14,7 @@ from ..core import Person
 from typing import List, Dict, Any
 from loguru import logger
 
+
 def build_toolset():
     toolset = SimpleToolset()
     # 朋友圈相关
