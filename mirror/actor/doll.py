@@ -136,12 +136,14 @@ class Doll:
         local = g.memory.group[-30:-1] if len(g.memory.group) > 1 else []
 
         content = input_template.format(current=current,
-                                        person_bio=p.bio,
+                                        person_summary=p.summary,
                                         group_bio=g.bio,
                                         local=str(local))
         history.append(Message(role="user", content=content))
 
         toolset = build_toolset()
+        # 群聊每次最多发送 1 条消息，多了挺烦人的
+        send_user_text_tool_life = 1
         while step < max_step_size:
             step += 1
             result = await kosong.step(
@@ -155,6 +157,11 @@ class Doll:
 
             tool_results = await result.tool_results()
             print(tool_results)
+            for tool_call in result.tool_calls:
+                if tool_call.function.name == 'SendGroupText':
+                    send_user_text_tool_life -= 1
+                    if send_user_text_tool_life <= 0:
+                        del toolset._tool_dict['SendGroupText']
 
             assistant_message = result.message
             tool_messages = [

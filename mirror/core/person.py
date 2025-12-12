@@ -44,15 +44,14 @@ class Person(ABC):
 
         self.basic_path = os.path.join(self.wxid_dir, "basic.json")
         self.bio_path = os.path.join(self.wxid_dir, "bio.md")
+        self.summary_path = os.path.join(self.wxid_dir, "summary.md")
         self.basic = ''
         self.bio = ''
+        self.summary = ''
 
         self.private_path = os.path.join(self.wxid_dir, "message.jsonl")
         self.group_path = os.path.join(self.wxid_dir, "group_segment.jsonl")
         self.llm = LLM()
-
-        # 加载消息的 offset，销毁时要用 offset 把消息追加下去
-        self.offset = (0, 0)
 
         # 群聊、私聊累计达到 threshold 条消息，就只保留末尾 max_keep 条有效的
         # 同时开始更新 bio
@@ -82,6 +81,8 @@ class Person(ABC):
         # 加载基本信息
         self.basic = await try_load_text(self.basic_path)
         self.bio = await try_load_text(self.bio_path)
+        self.summary = await try_load_text(self.summary_path)
+
         # 扔个空消息，触发分析
         await self.update(wk_msg=None)
 
@@ -95,7 +96,6 @@ class Person(ABC):
         logger.info(
             f'Person {me.wxid}: 正在保存 {len(me.memory.private)} 私聊消息, {len(me.memory.group)} 群聊消息'
         )
-        private_offset, group_offset = me.offset
 
         if not me.memory.private:
             logger.info('Person 私聊内存为空，跳过保存私聊消息')
@@ -148,10 +148,10 @@ class Person(ABC):
                                          mode='write')
 
             logger.info(
-                f"Person {self.wxid}: 当前 {len(self.memory.private)} 条私聊消息+ {len(self.memory.group)} 条群聊消息，完成个性分析"
+                f"Person {self.wxid}: 当前 {len(self.memory.private)} 条私聊 + {len(self.memory.group)} 条群聊消息，完成个性分析"
             )
 
-        elif self.update_counter > 0 and self.update_counter % 10 == 0:
+        elif self.update_counter > 0 and self.update_counter % 5 == 0:
             await dump_multi_inner_async(self.private_path,
                                          self.memory.private,
                                          mode='write')
@@ -202,9 +202,8 @@ class Person(ABC):
         await safe_write_text(self.bio_path, self.bio)
 
         prompt = SUMMARY_BIO.format(bio=self.bio)
-        summary = await self.llm.chat_text(prompt=prompt)
-        summary_path = os.path.join(self.wxid_dir, 'summary.md')
-        await safe_write_text(summary_path, summary)
+        self.summary = await self.llm.chat_text(prompt=prompt)
+        await safe_write_text(self.summary_path, self.summary)
 
     async def _analyze_personality(self):
         """基于消息数据进行个性分析"""

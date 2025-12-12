@@ -333,39 +333,3 @@ def get_factory(max_cache_size: int = 128) -> WeFactory:
         _factory_instance = WeFactory(max_cache_size=max_cache_size)
     return _factory_instance
 
-
-# 便捷的同步包装函数（用于非异步环境）
-def get_person_sync(wxid: str, max_cache_size: int = 100) -> Optional[Person]:
-    """同步获取Person对象"""
-    factory = get_factory(max_cache_size)
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    return loop.run_until_complete(factory.get_person(wxid))
-
-
-def get_group_sync(group_id: str,
-                   max_cache_size: int = 100) -> Optional[Group]:
-    """同步获取Group对象"""
-    factory = get_factory(max_cache_size)
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    return loop.run_until_complete(factory.get_group(group_id))
-
-
-def get_entity_sync(
-        wxid: str,
-        max_cache_size: int = 100) -> Optional[Union[Person, Group]]:
-    """同步获取实体对象（自动判断类型）"""
-    factory = get_factory(max_cache_size)
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    return loop.run_until_complete(factory.get_entity(wxid))

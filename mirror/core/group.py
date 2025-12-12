@@ -34,7 +34,6 @@ class Group(ABC):
     def __init__(self, group_id: str):
         self.group_id = group_id
         self.memory = MemoryStream()
-        self.bio = ""
 
         current_file = inspect.getfile(self.__class__)
         data_dir = os.path.join(os.path.dirname(current_file), "..", "..",
@@ -44,6 +43,10 @@ class Group(ABC):
         self.group_path = os.path.join(self.group_dir, "message.jsonl")
         self.llm = LLM()
         self.bio_path = os.path.join(self.group_dir, "bio.md")
+        self.bio = ""
+
+        self.summary_path = os.path.join(self.group_dir, "summary.md")
+        self.summary = ""
 
         # 群聊累计达到 threshold 条消息，就只保留末尾 max_keep 条有效的
         # 同时开始更新 bio
@@ -63,6 +66,8 @@ class Group(ABC):
         # 加载基本信息
         self.basic = await try_load_text(self.basic_path)
         self.bio = await try_load_text(self.bio_path)
+        self.summary = await try_load_text(self.summary_path)
+        
         # 扔个空消息，触发分析
         await self.update(wk_msg=None)
 
@@ -83,6 +88,7 @@ class Group(ABC):
 
     async def update(self, wk_msg: Message):
         """更新消息数据，触发个性分析"""
+        self.update_counter += 1
         if wk_msg:
             # 如果是群聊消息，加 group
             inner = convert_wkteam_to_inner(wk_msg)
@@ -101,7 +107,7 @@ class Group(ABC):
             logger.info(
                 f"Group {self.group_id}: 当前 {len(self.memory.group)} 条群聊消息，完成个性分析"
             )
-        elif self.update_counter > 0 and self.update_counter % 10 == 0:
+        elif self.update_counter > 0 and self.update_counter % 5 == 0:
             await dump_multi_inner_async(self.group_path,
                                          self.memory.group,
                                          mode='write')
@@ -137,6 +143,5 @@ class Group(ABC):
         await safe_write_text(bio_path, self.bio)
 
         prompt = SUMMARY_BIO.format(bio=self.bio)
-        summary = await self.llm.chat_text(prompt=prompt)
-        summary_path = os.path.join(self.group_dir, 'summary.md')
-        await safe_write_text(summary_path, summary)
+        self.summary = await self.llm.chat_text(prompt=prompt)
+        await safe_write_text(self.summary_path, self.summary)
