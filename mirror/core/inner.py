@@ -20,7 +20,7 @@ import os
 from dataclasses import dataclass
 from dataclasses_json import dataclass_json
 from ..wechat.message import Message
-
+import time
 
 @dataclass_json
 @dataclass
@@ -33,6 +33,15 @@ class Inner:
     content: str = ''
     ts: int = 0
 
+def build_self_inner(sender_name: str, content: str, group_id:str = '') -> Inner:
+    """构建自己的消息 Inner 对象"""
+    inner = Inner(type='text',
+                  sender_id='me',
+                  group_id=group_id,
+                  sender_name=sender_name,
+                  content=content,
+                  ts=int(time.time()))
+    return inner
 
 def convert_wkteam_to_inner(msg: Message):
     """将 wkteam 的 Message 对象转换为 Inner 对象"""

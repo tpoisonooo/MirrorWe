@@ -22,10 +22,11 @@ from ..tool.contact import ListGroup, ListPrivateFriend, GroupChatFriend, Search
 from ..tool.message import RevertAll, SendGroupUrl, SendGroupEmoji, SendGroupText, SendGroupImage, SendUserText
 from ..tool.think import Think
 from ..primitive import load_desc, time_string
-from ..core import Person
+from ..core import Person, build_self_inner
 from typing import List, Dict, Any
 from loguru import logger
 from .helper import build_toolset
+import json
 
 load_dotenv()
 
@@ -43,6 +44,7 @@ class Doll:
         assert api_key is not None, "Expect KIMI_API_KEY environment variable"
         model = model or "kimi-k2-turbo-preview"
 
+        self.name = 'MirrorDoll'
         self.chat_provider = Kimi(base_url=base_url,
                                   api_key=api_key,
                                   model=model)
@@ -50,6 +52,7 @@ class Doll:
         self.welcome_template = (Path(__file__).parent /
                                  "agent_welcome.md").read_text(
                                      encoding="utf-8")
+                                    
         logger.info(f'Awake {__name__}')
 
     def tool_result_to_message(self, result: ToolResult) -> Message:
@@ -66,7 +69,7 @@ class Doll:
     async def agent_loop_private(self, p: Person):
         history: list[Message] = []
         step = 0
-        max_step_size = 3
+        max_step_size = 4
 
         system_prompt = '{}\n\n{}'.format(
             time_string(), load_desc(Path(__file__).parent / "doll.md", {}))
@@ -82,8 +85,8 @@ class Doll:
                                         personality=str(p.analysis_result),
                                         local=str(local))
         history.append(Message(role="user", content=content))
-        toolset = build_toolset()
 
+        skip = [] 
         # 私聊每次最多发送 2 条消息，多了挺烦人的
         send_user_text_tool_life = 2
         while step < max_step_size:
@@ -91,7 +94,7 @@ class Doll:
             result = await kosong.step(
                 chat_provider=self.chat_provider,
                 system_prompt=system_prompt,
-                toolset=toolset,
+                toolset=build_toolset(skip=skip),
                 history=history,
             )
 
@@ -101,10 +104,19 @@ class Doll:
 
             for tool_call in result.tool_calls:
                 if tool_call.function.name == 'SendUserText':
+                    try:
+                        send_text = json.loads(tool_call.function.arguments).get('text', '')
+                    except Exception as e:
+                        logger.error(f'解析 tool_call_arguments 参数失败, {str(e)}: {str(tool_call.function.arguments)}')
+                        send_text = tool_call.function.arguments
+
+                    inner = build_self_inner(sender_name=self.name, content=send_text)
+                    p.memory.add(private=inner)
+
                     send_user_text_tool_life -= 1
                     if send_user_text_tool_life <= 0:
-                        del toolset._tool_dict['SendUserText']
-
+                        skip += ['SendUserText']
+                        
             assistant_message = result.message
             tool_messages = [
                 self.tool_result_to_message(tr) for tr in tool_results
@@ -125,7 +137,7 @@ class Doll:
     async def agent_loop_group(self, g: Group, p: Person):
         history: list[Message] = []
         step = 0
-        max_step_size = 2
+        max_step_size = 3
 
         system_prompt = '{}\n\n{}'.format(
             time_string(), load_desc(Path(__file__).parent / "doll.md", {}))
@@ -134,14 +146,12 @@ class Doll:
 
         current = g.memory.group[-1]
         local = g.memory.group[-30:-1] if len(g.memory.group) > 1 else []
-
         content = input_template.format(current=current,
                                         person_summary=p.summary,
                                         group_bio=g.bio,
                                         local=str(local))
         history.append(Message(role="user", content=content))
 
-        toolset = build_toolset()
         # 群聊每次最多发送 1 条消息，多了挺烦人的
         send_user_text_tool_life = 1
         while step < max_step_size:
@@ -149,7 +159,7 @@ class Doll:
             result = await kosong.step(
                 chat_provider=self.chat_provider,
                 system_prompt=system_prompt,
-                toolset=toolset,
+                toolset=build_toolset(skip=skip),
                 history=history,
             )
 
@@ -159,9 +169,23 @@ class Doll:
             print(tool_results)
             for tool_call in result.tool_calls:
                 if tool_call.function.name == 'SendGroupText':
+                    # 取回参数
+                    try:
+                        tool_call_arguments = json.loads(tool_call.function.arguments)
+                        send_text = tool_call_arguments.get('text', '')
+                        group_id = tool_call_arguments.get('group_id', '')
+                    except Exception as e:
+                        logger.error(f'解析 tool_call_arguments 参数失败, {str(e)}: {str(tool_call.function.arguments)}')
+                        send_text = tool_call.function.arguments
+                        group_id = ''
+
+                    inner = build_self_inner(sender_name=self.name, content=send_text, group_id=group_id)
+                    # 群聊里需要加一下 MirrorDoll 发过的消息
+                    g.memory.add(group=inner)
+
                     send_user_text_tool_life -= 1
                     if send_user_text_tool_life <= 0:
-                        del toolset._tool_dict['SendGroupText']
+                        skip += ['SendGroupText']
 
             assistant_message = result.message
             tool_messages = [

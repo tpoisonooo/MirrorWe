@@ -48,6 +48,7 @@ async def agent_loop(chat_provider: ChatProvider, toolset: Toolset):
 
             tool_results = await result.tool_results()
             assistant_message = result.message
+
             tool_messages = [tool_result_to_message(tr) for tr in tool_results]
 
             if s := assistant_message.extract_text():

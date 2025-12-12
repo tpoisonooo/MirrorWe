@@ -15,7 +15,7 @@ from typing import List, Dict, Any
 from loguru import logger
 
 
-def build_toolset():
+def build_toolset(skip: List[str] = []) -> SimpleToolset:
     toolset = SimpleToolset()
     # 朋友圈相关
     toolset += GetCircleList()
@@ -35,9 +35,13 @@ def build_toolset():
     toolset += RevertAll()
     # toolset += SendGroupUrl()
     # toolset += SendGroupEmoji()
-    toolset += SendGroupText()
-    # toolset += SendGroupImage()
-    toolset += SendUserText()
+    
+    # Hotfix here: allow skipping sending tools
+    if 'SendGroupText' not in skip:
+        toolset += SendGroupText()
+
+    if 'SendUserText' not in skip:
+        toolset += SendUserText()
 
     # 搜索相关
     toolset += WebSearch()
