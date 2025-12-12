@@ -5,8 +5,11 @@ from kosong.tooling import CallableTool2, ToolOk, ToolReturnValue
 from pydantic import BaseModel, Field
 from ...primitive import load_desc
 
-class GetCircleParams(BaseModel):
-    wx_id: str = Field(description="微信用户ID，用于获取该用户的朋友圈")
+class GetCircleListParams(BaseModel):
+    wx_id: str = Field(description="微信用户ID，用于获取该用户的朋友圈动态列表")
+
+class GetCircleDetailParams(BaseModel):
+    sns_id: str = Field(description="朋友圈动态ID，用于获取该动态的详细信息")
 
 class SnsPraiseParams(BaseModel):
     sns_id: str = Field(description="朋友圈动态ID，用于给该动态点赞")
@@ -18,17 +21,30 @@ class SnsCommentParams(BaseModel):
 class SnsSendParams(BaseModel):
     content: str = Field(description="朋友圈内容，要发布的朋友圈文本。文本建议 30~180 字。")
 
-class GetCircle(CallableTool2[GetCircleParams]):
-    name: str = "GetCircle"
-    description: str = load_desc(Path(__file__).parent / "get_circle.md", {})
-    params: type[GetCircleParams] = GetCircleParams
+class GetCircleList(CallableTool2[GetCircleListParams]):
+    name: str = "GetCircleList"
+    description: str = load_desc(Path(__file__).parent / "get_circle_list.md", {})
+    params: type[GetCircleListParams] = GetCircleListParams
 
     @override
-    async def __call__(self, params: GetCircleParams) -> ToolReturnValue:
+    async def __call__(self, params: GetCircleListParams) -> ToolReturnValue:
         from mirror.wechat.api_circle import APICircle
         api = APICircle()
-        result = await api.get_circle(params.wx_id)
+        result = await api.get_circle_list(params.wx_id)
         return ToolOk(output=str(result), message=f"成功获取用户 {params.wx_id} 的朋友圈")
+
+
+class GetCircleDetail(CallableTool2[GetCircleDetailParams]):
+    name: str = "GetCircleDetail"
+    description: str = load_desc(Path(__file__).parent / "get_circle_detail.md", {})
+    params: type[GetCircleDetailParams] = GetCircleDetailParams
+
+    @override
+    async def __call__(self, params: GetCircleDetailParams) -> ToolReturnValue:
+        from mirror.wechat.api_circle import APICircle
+        api = APICircle()
+        result = await api.get_circle_detail(params.sns_id)
+        return ToolOk(output=str(result), message=f"成功获取朋友圈动态 {params.sns_id} 的详细信息")
 
 
 class SnsPraise(CallableTool2[SnsPraiseParams]):

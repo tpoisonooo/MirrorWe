@@ -3,7 +3,7 @@ from __future__ import annotations
 from kosong.tooling.simple import SimpleToolset
 from kosong.chat_provider.kimi import Kimi
 
-from ..tool.circle import GetCircle, SnsPraise, SnsComment, SnsSend
+from ..tool.circle import GetCircleList, GetCircleDetail, SnsPraise, SnsComment, SnsSend
 from ..tool.contact import ListGroup, ListPrivateFriend, GroupChatFriend, SearchAndAdd, GetContact
 from ..tool.message import RevertAll, SendGroupUrl, SendGroupEmoji, SendGroupText, SendGroupImage, SendUserText
 from ..tool.think import Think, Wait, Finish
@@ -18,7 +18,8 @@ from loguru import logger
 def build_toolset():
     toolset = SimpleToolset()
     # 朋友圈相关
-    toolset += GetCircle()
+    toolset += GetCircleList()
+    toolset += GetCircleDetail()
     toolset += SnsPraise()
     toolset += SnsComment()
     # toolset += SnsSend()

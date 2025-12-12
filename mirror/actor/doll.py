@@ -17,7 +17,7 @@ from kosong.tooling import CallableTool2, ToolError, ToolOk, ToolResult, ToolRet
 from kosong.tooling.simple import SimpleToolset
 from kosong.chat_provider.kimi import Kimi
 
-from ..tool.circle import GetCircle, SnsPraise, SnsComment, SnsSend
+from ..tool.circle import GetCircleList, SnsPraise, SnsComment, SnsSend
 from ..tool.contact import ListGroup, ListPrivateFriend, GroupChatFriend, SearchAndAdd, GetContact
 from ..tool.message import RevertAll, SendGroupUrl, SendGroupEmoji, SendGroupText, SendGroupImage, SendUserText
 from ..tool.think import Think

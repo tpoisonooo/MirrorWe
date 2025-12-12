@@ -8,9 +8,6 @@ from ..primitive import safe_write_text, SingletonMeta
 import aiofiles
 import time
 
-system_start_time = time.time()
-
-
 class APIManage(metaclass=SingletonMeta):
 
     def __init__(self):

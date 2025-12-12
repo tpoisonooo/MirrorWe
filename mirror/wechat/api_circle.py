@@ -15,7 +15,7 @@ class APICircle(metaclass=SingletonMeta):
         self.system_start_time = time.time()
         self.cookie = Cookie()
 
-    async def get_circle(self, wxid: str) -> Dict[str, Any]:
+    async def get_circle_list(self, wxid: str) -> Dict[str, Any]:
         """
         获取好友首页朋友圈 https://wkteam.cn/api-wen-dang2/peng-you-quan/getFriendCircle.html
         目前只实现首页。
@@ -117,7 +117,7 @@ class APICircle(metaclass=SingletonMeta):
         if not wxid:
             logger.warning(f'{__file__} sns_praise_first_one input empty')
         try:
-            circle_data = await self.get_circle(wxid)
+            circle_data = await self.get_circle_list(wxid)
             sns_id = circle_data.get('sns', [])[0].get('id')
             await self.sns_praise(sns_id)
         except Exception as e:
@@ -130,7 +130,7 @@ class APICircle(metaclass=SingletonMeta):
         每天只能发一次。
         """
 
-        if time.time() - system_start_time < 3 * 24 * 3600:
+        if time.time() - self.system_start_time < 3 * 24 * 3600:
             logger.error(
                 'Must stay online for 3 days before posting to circle')
             return {}
