@@ -9,7 +9,7 @@ import time
 
 class APICircle(metaclass=SingletonMeta):
     def __init__(self):
-        # 朋友圈是高危工作，记录启动时间
+        # 朋友圈是高危动作，记录启动时间
         self.system_start_time = time.time()
         self.cookie = Cookie()
 

@@ -119,9 +119,10 @@ class LLM:
     async def chat_text(self,
                    prompt: str,
                    system_prompt=None,
-                   tools=[],
-                   enable_cache:bool=True) -> str:
-        if enable_cache:
+                   tools=[]) -> str:
+        """Chat with text response."""
+        llm_cache_enable = get_env_with_default('LLM_CACHE_ENABLE', False)
+        if llm_cache_enable:
             r = self.cache.get(query=prompt, backend=self.provider.model)
             if r is not None:
                 logger.info('LLM cache hit')

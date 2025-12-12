@@ -43,19 +43,6 @@ def convert_wkteam_to_inner(msg: Message):
                   sender_name=sender_name, content=msg.content, ts=msg.ts)
     return inner
 
-# def convert_json_to_inner(obj: Dict[str, Any]):
-#     """将原始JSON对象转换为 Inner 对象"""
-#     if type(obj) is not dict:
-#         import pdb; pdb.set_trace()
-#         pass
-#     inner = Inner(type=obj.get('type', ''),
-#                   group_id=obj.get('group_id', ''),
-#                   sender_id=obj.get('sender_id', ''),
-#                   sender_name=obj.get('sender_name', ''),
-#                   content=obj.get('content', '').strip(),
-#                   ts=obj.get('ts', 0))
-#     return inner
-
 def convert_to_inner(obj: Any):
     """将对象转换为 Inner 对象"""
     if isinstance(obj, Message):

@@ -112,10 +112,14 @@ class Message:
             query = data['content']
             parse_type = 'text'
 
+        elif _type in ['30001']:
+            # friend request
+            parse_type = 'friend_request'
+            query = data.get('content', '')
         elif type(_type) is int:
             logger.warning(wx_msg)
         else:
-            return Exception('Unknown msg type {}'.format(_type))
+            logger.warning(f'Unknown msg type {_type} with data {data}')
 
         query = query.encode('UTF-8', 'ignore').decode('UTF-8')
         if query.startswith(f'@{self.BOT_NAME}'):

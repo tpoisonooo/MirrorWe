@@ -42,6 +42,9 @@ dependencies = [
     "kosong>=0.31.0",
     "anyio>=4.11.0",
     "dataclasses-json>=0.6.7",
+    "alibabacloud-searchplat20240529>=2.0.1",
+    "alibabacloud-tea-openapi>=0.3.14",
+    "alibabacloud-credentials==1.0.1",
 ]
 
 [[tool.uv.index]]

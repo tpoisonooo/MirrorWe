@@ -7,13 +7,46 @@ from loguru import logger
 from .cookie import Cookie
 from .helper import async_post
 from ..primitive.metaclass import SingletonMeta
+from ..primitive.utils import get_env_or_raise
 import time
 import aiofiles
+import re
+import asyncio
+
+def remove_parentheses(s):
+    """移除字符串中的小括号及其包含的内容"""
+    pairs = [('(', ')'), ('（', '）')]
+    
+    for left_paren, right_paren in pairs:
+        while True:
+            # 找到第一个右括号
+            right = s.find(right_paren)
+            if right == -1:
+                break
+            
+            # 在右括号左侧找对应的左括号
+            left = s.rfind(left_paren, 0, right)
+            if left == -1:
+                break
+            
+            # 移除括号及其内容
+            s = s[:left] + s[right + 1:]
+    return s
 
 class APIMessage(metaclass=SingletonMeta):
     def __init__(self):
         self.cookie = Cookie()
         self.sent_msg = {}
+        
+    async def magic_text(self, text:str):
+        model = get_env_or_raise("KIMI_MODEL_NAME")
+        if 'qwen3-30b-a3b-instruct-2507' in model:
+            # 过滤掉不像人类的部分
+            # 查找（）内的东西，删掉
+            text = remove_parentheses(text)
+        sleep_time = len(text) / 40 * 60
+        await asyncio.sleep(sleep_time)
+        return text
 
     async def send_group_image(self, group_id: str, image_url: str):
         headers = {
@@ -58,6 +91,8 @@ class APIMessage(metaclass=SingletonMeta):
         return None
 
     async def send_group_text(self, group_id: str, text: str):
+        text = await self.magic_text(text)
+        
         headers = {
             'Content-Type': 'application/json',
             'Authorization': self.cookie.auth
@@ -81,6 +116,7 @@ class APIMessage(metaclass=SingletonMeta):
         return None
 
     async def send_user_text(self, user_id: str, text: str):
+        text = await self.magic_text(text)
         headers = {
             'Content-Type': 'application/json',
             'Authorization': self.cookie.auth
