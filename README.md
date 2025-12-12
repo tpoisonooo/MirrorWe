@@ -46,7 +46,12 @@ cp .env_example .env
 
 填写 `.env` 中需要的参数，然后执行：
 
-- `uv run -m mirror.cli --help` 。初始化通讯录、收发群聊私聊消息、跨群消息转发
+- `uv run -m mirror.cli --help`
+  - `--init` 初始化通讯录
+  - `--bind` 监听消息，刻画好友+群组
+  - `--actor` 启用哪个角色回复私聊
+  - `--act_group_id` 这个角色响应哪个群
+  - `--forward` 跨群转发图片文字表情包和链接。`.env` 配置了群号
 - `uv run -m mirror.main` 输入命令，让 AI 在微信中思考执行（需要先运行几天 `mirror.cli`）
 
 
