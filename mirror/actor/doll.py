@@ -88,7 +88,6 @@ class Doll:
                                         local=str(local))
         history.append(Message(role="user", content=content))
 
-        skip = [] 
         send_user_text_tool_life = 2
         toolset = build_toolset()
         while step < max_step_size:
@@ -169,7 +168,6 @@ class Doll:
 
             tool_results = await result.tool_results()
             print(tool_results)
-            skip = []
             for tool_call in result.tool_calls:
                 if tool_call.function.name == 'SendGroupText':
                     # 取回参数
