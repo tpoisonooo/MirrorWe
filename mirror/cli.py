@@ -214,7 +214,7 @@ class WkteamManager:
                 await g.update(wk_msg=msg)
 
                 # 如果是配置的 act_group_id，则触发群内处理
-                if self.actor and self.act_group_id in msg.group_id:
+                if self.actor and self.act_group_id is not None in msg.group_id:
                     await self.actor.agent_loop_group(g, p)
 
             # 7. 如果是群消息，是否需要跨群转发

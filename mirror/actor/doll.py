@@ -28,6 +28,8 @@ from loguru import logger
 from .helper import build_toolset
 import json
 
+import json
+
 load_dotenv()
 
 
@@ -87,8 +89,8 @@ class Doll:
         history.append(Message(role="user", content=content))
 
         skip = [] 
-        # 私聊每次最多发送 2 条消息，多了挺烦人的
         send_user_text_tool_life = 2
+        toolset = build_toolset()
         while step < max_step_size:
             step += 1
             result = await kosong.step(
@@ -107,16 +109,17 @@ class Doll:
                     try:
                         send_text = json.loads(tool_call.function.arguments).get('text', '')
                     except Exception as e:
-                        logger.error(f'解析 tool_call_arguments 参数失败, {str(e)}: {str(tool_call.function.arguments)}')
+                        logger.error(f'Parse tool_call_arguments failed, {str(e)}: {str(tool_call.function.arguments)}')
                         send_text = tool_call.function.arguments
 
                     inner = build_self_inner(sender_name=self.name, content=send_text)
                     p.memory.add(private=inner)
 
+                    # 私聊每轮最多发 2 条消息
                     send_user_text_tool_life -= 1
                     if send_user_text_tool_life <= 0:
-                        skip += ['SendUserText']
-                        
+                        toolset -= SendUserText()
+
             assistant_message = result.message
             tool_messages = [
                 self.tool_result_to_message(tr) for tr in tool_results
@@ -152,8 +155,7 @@ class Doll:
                                         local=str(local))
         history.append(Message(role="user", content=content))
 
-        # 群聊每次最多发送 1 条消息，多了挺烦人的
-        send_user_text_tool_life = 1
+        toolset = build_toolset()
         while step < max_step_size:
             step += 1
             result = await kosong.step(
@@ -167,6 +169,7 @@ class Doll:
 
             tool_results = await result.tool_results()
             print(tool_results)
+            skip = []
             for tool_call in result.tool_calls:
                 if tool_call.function.name == 'SendGroupText':
                     # 取回参数
@@ -174,8 +177,10 @@ class Doll:
                         tool_call_arguments = json.loads(tool_call.function.arguments)
                         send_text = tool_call_arguments.get('text', '')
                         group_id = tool_call_arguments.get('group_id', '')
+                        # 群聊每次最多发送 1 条消息
+                        toolset -= SendGroupText()
                     except Exception as e:
-                        logger.error(f'解析 tool_call_arguments 参数失败, {str(e)}: {str(tool_call.function.arguments)}')
+                        logger.error(f'Parse tool_call_arguments failed, {str(e)}: {str(tool_call.function.arguments)}')
                         send_text = tool_call.function.arguments
                         group_id = ''
 
@@ -183,9 +188,6 @@ class Doll:
                     # 群聊里需要加一下 MirrorDoll 发过的消息
                     g.memory.add(group=inner)
 
-                    send_user_text_tool_life -= 1
-                    if send_user_text_tool_life <= 0:
-                        skip += ['SendGroupText']
 
             assistant_message = result.message
             tool_messages = [

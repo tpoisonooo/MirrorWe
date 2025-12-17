@@ -37,11 +37,10 @@ def build_toolset(skip: List[str] = []) -> SimpleToolset:
     # toolset += SendGroupEmoji()
     
     # Hotfix here: allow skipping sending tools
-    if 'SendGroupText' not in skip:
-        toolset += SendGroupText()
-
-    if 'SendUserText' not in skip:
-        toolset += SendUserText()
+    # if 'SendGroupText' not in skip:
+    toolset += SendGroupText()
+    # if 'SendUserText' not in skip:
+    toolset += SendUserText()
 
     # 搜索相关
     toolset += WebSearch()

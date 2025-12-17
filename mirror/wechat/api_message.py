@@ -43,7 +43,7 @@ class APIMessage(metaclass=SingletonMeta):
 
     async def magic_text(self, text: str):
         model = get_env_or_raise("KIMI_MODEL_NAME")
-        if 'qwen3-30b-a3b-instruct-2507' in model:
+        if 'qwen3' in model:
             # 过滤掉不像人类的部分
             # 查找（）内的东西，删掉
             text = remove_parentheses(text)
