@@ -3,9 +3,8 @@
 朋友圈测试文件 - 测试朋友圈相关API功能
 """
 
-import sys
-import os
 import asyncio
+import sys
 from pathlib import Path
 
 # 方法1: 将项目根目录添加到 Python 路径 (推荐用于测试)
@@ -107,7 +106,7 @@ async def main():
 
     print("\n1. 测试获取好友朋友圈:")
     circle_data = await test_get_circle_list(wxid='wxid_raxq4pq3emg212')
-    test_results.append(True if circle_data else False)
+    test_results.append(bool(circle_data))
 
     sns_id = circle_data.get('sns', [])[0].get('id')
 
@@ -127,9 +126,9 @@ async def main():
     passed = sum(test_results)
     total = len(test_results)
 
-    print(f"\n=== 测试总结 ===")
+    print("\n=== 测试总结 ===")
     print(f"通过: {passed}/{total}")
-    print(f"测试功能: 获取朋友圈、获取详情、点赞、评论、发布朋友圈、时间限制检查")
+    print("测试功能: 获取朋友圈、获取详情、点赞、评论、发布朋友圈、时间限制检查")
 
     return passed == total
 

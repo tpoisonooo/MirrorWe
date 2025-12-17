@@ -4,7 +4,9 @@ from typing import override
 
 from kosong.tooling import CallableTool2, ToolOk, ToolReturnValue
 from pydantic import BaseModel, Field
+
 from ...primitive import load_desc
+
 
 class ThinkParams(BaseModel):
     thought: str = Field(description=("A thought to think about."))

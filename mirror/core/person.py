@@ -2,29 +2,31 @@
 增强版 Person 类，支持加载本地消息数据
 """
 
-from abc import ABC, abstractmethod
-import json
-import os
-import sys
-import inspect
-import aiofiles
-import weakref
 import atexit
 import datetime
-
-from pathlib import Path
-from typing import List, Dict, Any
-from loguru import logger
-from ..prompt import FRIEND_BIO, SUMMARY_BIO
-from .inner import convert_wkteam_to_inner, Inner, parse_multi_inner_async, dump_multi_inner_sync, dump_multi_inner_async
-from ..primitive import safe_write_text, try_load_text
-from ..primitive import LLM, always_get_an_event_loop
-from ..wechat.message import Message
+import inspect
+import os
+import weakref
+from abc import ABC
 from datetime import datetime
+from typing import Any
+
+from loguru import logger
 
 # 添加项目路径
 from mirror.core.memory import MemoryStream
 from mirror.core.personality import Personality
+
+from ..primitive import LLM, safe_write_text, try_load_text
+from ..prompt import FRIEND_BIO, SUMMARY_BIO
+from ..wechat.message import Message
+from .inner import (
+    Inner,
+    convert_wkteam_to_inner,
+    dump_multi_inner_async,
+    dump_multi_inner_sync,
+    parse_multi_inner_async,
+)
 
 
 class Person(ABC):
@@ -268,7 +270,7 @@ class Person(ABC):
             logger.error(f"个性分析失败: {e}")
             self.analysis_result = self._get_default_analysis()
 
-    def _get_default_analysis(self) -> Dict[str, Any]:
+    def _get_default_analysis(self) -> dict[str, Any]:
         """获取默认分析结果"""
         return {
             'total_messages': 0,
@@ -290,7 +292,7 @@ class Person(ABC):
             'keywords': [],
         }
 
-    async def _analyze_time_pattern(self, timestamps: List[int]) -> str:
+    async def _analyze_time_pattern(self, timestamps: list[int]) -> str:
         """分析时间模式"""
 
         if not timestamps:
@@ -321,7 +323,7 @@ class Person(ABC):
             return "night_person"
 
     async def _analyze_language_features(
-            self, contents: List[str]) -> Dict[str, Any]:
+            self, contents: list[str]) -> dict[str, Any]:
         """分析语言特征"""
         if not contents:
             return {
@@ -353,7 +355,7 @@ class Person(ABC):
         return features
 
     async def _analyze_emotion_pattern(self,
-                                       contents: List[str]) -> Dict[str, Any]:
+                                       contents: list[str]) -> dict[str, Any]:
         """分析情感模式"""
         if not contents:
             return {
@@ -394,7 +396,7 @@ class Person(ABC):
             'dominant_emotion': dominant_emotion,
         }
 
-    async def _extract_keywords(self, contents: List[str]) -> List[str]:
+    async def _extract_keywords(self, contents: list[str]) -> list[str]:
         """提取关键词"""
         if not contents:
             return []
@@ -433,7 +435,7 @@ class Person(ABC):
         self.personality.love_language = await self._infer_love_language(
             analysis)
 
-    async def _infer_mbti(self, analysis: Dict[str, Any]) -> str:
+    async def _infer_mbti(self, analysis: dict[str, Any]) -> str:
         """基于分析推断 MBTI 类型"""
         if not analysis or analysis.get('total_messages', 0) == 0:
             return "ISFJ"
@@ -456,8 +458,8 @@ class Person(ABC):
 
         return f"{e_i}{s_n}{t_f}{j_p}"
 
-    async def _generate_bigfive(self, analysis: Dict[str,
-                                                     Any]) -> Dict[str, float]:
+    async def _generate_bigfive(self, analysis: dict[str,
+                                                     Any]) -> dict[str, float]:
         """生成 Big Five 人格特质"""
         if not analysis or analysis.get('total_messages', 0) == 0:
             return {"O": 0.5, "C": 0.5, "E": 0.5, "A": 0.5, "N": 0.5}
@@ -492,7 +494,7 @@ class Person(ABC):
             "N": neuroticism
         }
 
-    async def _infer_love_language(self, analysis: Dict[str, Any]) -> str:
+    async def _infer_love_language(self, analysis: dict[str, Any]) -> str:
         """推断爱情语言"""
         if not analysis:
             return "words_of_affirmation"

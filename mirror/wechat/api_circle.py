@@ -1,11 +1,11 @@
-from typing import List, Any, Dict
-import aiohttp
-import json
+import time
+from typing import Any
+
 from loguru import logger
+
+from ..primitive.metaclass import SingletonMeta
 from .cookie import Cookie
 from .helper import async_post, daily_task_once
-from ..primitive.metaclass import SingletonMeta
-import time
 
 
 class APICircle(metaclass=SingletonMeta):
@@ -15,7 +15,7 @@ class APICircle(metaclass=SingletonMeta):
         self.system_start_time = time.time()
         self.cookie = Cookie()
 
-    async def get_circle_list(self, wxid: str) -> Dict[str, Any]:
+    async def get_circle_list(self, wxid: str) -> dict[str, Any]:
         """
         获取好友首页朋友圈 https://wkteam.cn/api-wen-dang2/peng-you-quan/getFriendCircle.html
         目前只实现首页。
@@ -42,7 +42,7 @@ class APICircle(metaclass=SingletonMeta):
 
         return json_obj.get('data', {'sns': [], 'firstPageMd5': ''})
 
-    async def get_circle_detail(self, sns_id: str) -> Dict[str, Any]:
+    async def get_circle_detail(self, sns_id: str) -> dict[str, Any]:
         """
         获取朋友圈详情 https://wkteam.cn/api-wen-dang2/peng-you-quan/getSnsObject.html
         """
@@ -63,7 +63,7 @@ class APICircle(metaclass=SingletonMeta):
 
         return json_obj.get('data', {})
 
-    async def sns_praise(self, sns_id: str) -> Dict[str, Any]:
+    async def sns_praise(self, sns_id: str) -> dict[str, Any]:
         """
         朋友圈点赞 https://wkteam.cn/api-wen-dang2/peng-you-quan/snsPraise.html
         """
@@ -120,10 +120,10 @@ class APICircle(metaclass=SingletonMeta):
             circle_data = await self.get_circle_list(wxid)
             sns_id = circle_data.get('sns', [])[0].get('id')
             await self.sns_praise(sns_id)
-        except Exception as e:
-            logger.warning(f'No circle found')
+        except Exception:
+            logger.warning('No circle found')
 
-    async def sns_send(self, content: str) -> Dict[str, Any]:
+    async def sns_send(self, content: str) -> dict[str, Any]:
         """
         发朋友圈 https://wkteam.cn/api-wen-dang2/peng-you-quan/snsSend.html
         ！！！必须保持 3 天在线状态之后，才能发朋友圈！！！

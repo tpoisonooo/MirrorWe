@@ -3,7 +3,9 @@ from typing import override
 
 from kosong.tooling import CallableTool2, ToolOk, ToolReturnValue
 from pydantic import BaseModel, Field
+
 from ...primitive import load_desc
+
 
 class GetCircleListParams(BaseModel):
     wx_id: str = Field(description="微信用户ID，用于获取该用户的朋友圈动态列表")

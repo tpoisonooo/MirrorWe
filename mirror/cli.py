@@ -4,42 +4,23 @@ MirrorWe CLI 入口点
 """
 
 import argparse
-import sys
-import pdb
-from loguru import logger
+import asyncio
 import inspect
 import json
 import os
-import aiofiles
-
-import asyncio
-import requests
-import hashlib
-import re
-import string
 import random
-import time
-import types
-from dataclasses import asdict, dataclass, field
-from datetime import datetime
-from multiprocessing import Process
-from typing import List, Any, Dict
-from tqdm.asyncio import tqdm
 
 from aiohttp import web
-from bs4 import BeautifulSoup as BS
 from loguru import logger
-from readability import Document
-from dotenv import load_dotenv
-from .primitive import get_env_or_raise, get_env_with_default
-from .primitive import safe_write_text
+
+from .core.we import get_factory
+from .primitive import (
+    always_get_an_event_loop,
+    safe_write_text,
+)
+from .wechat import APICircle, APIContact, APIManage, APIMessage
 from .wechat.cookie import Cookie
 from .wechat.message import Message, save_message_to_file
-
-from .wechat import APIContact, APICircle, APIMessage, APIManage
-from .core.we import get_factory
-from .primitive import LLM, get_env_or_raise, always_get_an_event_loop
-from .prompt import SUMMARY_BIO
 
 
 class WkteamManager:
@@ -87,7 +68,7 @@ class WkteamManager:
 
             # 不是白名单群里的消息，不转发
             come_from_whitelist = False
-            for group_id, groupname in self.cookie.group_whitelist.items():
+            for group_id, _groupname in self.cookie.group_whitelist.items():
                 if msg.group_id == group_id:
                     come_from_whitelist = True
                     break
@@ -110,7 +91,7 @@ class WkteamManager:
                 match msg.type:
                     case 'text':
                         username = msg.push_content.split(':')[0].strip()
-                        formatted_reply = '{}：{}'.format(username, msg.content)
+                        formatted_reply = f'{username}：{msg.content}'
                         await self.api_message.send_group_text(
                             group_id=group_id, text=formatted_reply)
 
@@ -138,8 +119,7 @@ class WkteamManager:
                             group_id=group_id, md5=msg.md5, length=msg.length)
 
                     case 'ref_for_others' | 'ref_for_bot':
-                        formatted_reply = '{0}\n---\n{1}'.format(
-                            msg.content, msg.query)
+                        formatted_reply = f'{msg.content}\n---\n{msg.query}'
                         await self.api_message.send_group_text(
                             group_id=group_id, text=formatted_reply)
 
@@ -240,7 +220,7 @@ class WkteamManager:
         await runner.cleanup()
 
 
-async def init_basic(api_contact, targets: List[str], _type: str) -> None:
+async def init_basic(api_contact, targets: list[str], _type: str) -> None:
     """Initialize bio information for contacts or groups."""
     MAX_BATCH = 20
     current_file = inspect.getfile(inspect.currentframe())

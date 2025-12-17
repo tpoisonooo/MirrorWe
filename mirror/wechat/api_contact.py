@@ -1,12 +1,12 @@
-from typing import List, Any, Dict
-import aiohttp
-import json
-from loguru import logger
-from .cookie import Cookie
-from .helper import async_post
-from ..primitive.metaclass import SingletonMeta
 import asyncio
 import random
+from typing import Any
+
+from loguru import logger
+
+from ..primitive.metaclass import SingletonMeta
+from .cookie import Cookie
+from .helper import async_post
 
 
 class APIContact(metaclass=SingletonMeta):
@@ -14,7 +14,7 @@ class APIContact(metaclass=SingletonMeta):
     def __init__(self):
         self.cookie = Cookie()
 
-    async def get_address_book(self) -> Dict[str, List[str]]:
+    async def get_address_book(self) -> dict[str, list[str]]:
         """
         https://wkteam.cn/api-wen-dang2/deng-lu/queryFriendList.html
         """
@@ -49,7 +49,7 @@ class APIContact(metaclass=SingletonMeta):
             'others': []
         })
 
-    async def get_contact(self, wc_ids: List[str]) -> Dict[str, Any]:
+    async def get_contact(self, wc_ids: list[str]) -> dict[str, Any]:
         """
         https://wkteam.cn/api-wen-dang2/hao-you-cao-zuo/queryUserInfo.html
         !!! 每次请求要 sleep 300-800ms，且单次请求不超过20个 wxid !!!
@@ -137,7 +137,7 @@ class APIContact(metaclass=SingletonMeta):
             return f'Failed to add Contact: {err}'
         return 'Success, please wait for verification. About 10 minutes later, you can check the friend list again.'
 
-    async def parse_and_accept(self, message: Dict[str, Any]) -> bool:
+    async def parse_and_accept(self, message: dict[str, Any]) -> bool:
         """
         解析添加好友的消息，并自动同意好友请求
         https://wkteam.cn/api-wen-dang2/xiao-xi-jie-shou/shou-xiao-xi/callback.html#30001

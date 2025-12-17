@@ -1,17 +1,17 @@
-from typing import List, Any, Dict, Optional, Tuple
-import aiohttp
+import asyncio
+import hashlib
 import json
 import os
-import hashlib
+import time
+
+import aiofiles
+import aiohttp
 from loguru import logger
-from .cookie import Cookie
-from .helper import async_post
+
 from ..primitive.metaclass import SingletonMeta
 from ..primitive.utils import get_env_or_raise
-import time
-import aiofiles
-import re
-import asyncio
+from .cookie import Cookie
+from .helper import async_post
 
 
 def remove_parentheses(s):
@@ -59,8 +59,7 @@ class APIMessage(metaclass=SingletonMeta):
         }
         data = {'wId': self.cookie.wId, 'wcId': group_id, 'content': image_url}
 
-        json_obj, err = await async_post(url='http://{}/sendImage2'.format(
-            self.cookie.WKTEAM_IP_PORT),
+        json_obj, err = await async_post(url=f'http://{self.cookie.WKTEAM_IP_PORT}/sendImage2',
                                          data=data,
                                          headers=headers)
         if err is not None:
@@ -87,8 +86,7 @@ class APIMessage(metaclass=SingletonMeta):
             'imgSize': length
         }
 
-        json_obj, err = await async_post(url='http://{}/sendEmoji'.format(
-            self.cookie.WKTEAM_IP_PORT),
+        json_obj, err = await async_post(url=f'http://{self.cookie.WKTEAM_IP_PORT}/sendEmoji',
                                          data=data,
                                          headers=headers)
         if err is not None:
@@ -112,8 +110,7 @@ class APIMessage(metaclass=SingletonMeta):
         }
         data = {'wId': self.cookie.wId, 'wcId': group_id, 'content': text}
 
-        json_obj, err = await async_post(url='http://{}/sendText'.format(
-            self.cookie.WKTEAM_IP_PORT),
+        json_obj, err = await async_post(url=f'http://{self.cookie.WKTEAM_IP_PORT}/sendText',
                                          data=data,
                                          headers=headers)
         if err is not None:
@@ -136,8 +133,7 @@ class APIMessage(metaclass=SingletonMeta):
         }
         data = {'wId': self.cookie.wId, 'wcId': user_id, 'content': text}
 
-        json_obj, err = await async_post(url='http://{}/sendText'.format(
-            self.cookie.WKTEAM_IP_PORT),
+        json_obj, err = await async_post(url=f'http://{self.cookie.WKTEAM_IP_PORT}/sendText',
                                          data=data,
                                          headers=headers)
         if err is not None:
@@ -167,8 +163,7 @@ class APIMessage(metaclass=SingletonMeta):
             'url': url
         }
 
-        json_obj, err = await async_post(url='http://{}/sendUrl'.format(
-            self.cookie.WKTEAM_IP_PORT),
+        json_obj, err = await async_post(url=f'http://{self.cookie.WKTEAM_IP_PORT}/sendUrl',
                                          data=data,
                                          headers=headers)
         if err is not None:
@@ -188,8 +183,7 @@ class APIMessage(metaclass=SingletonMeta):
             # 撤回 2 分钟内发出的所有消息
             if key in self.cookie.group_whitelist:
                 groupname = self.cookie.group_whitelist[key]
-                logger.debug('revert message in group {} {}'.format(
-                    groupname, key))
+                logger.debug(f'revert message in group {groupname} {key}')
 
             # [{'type': 1, 'msgId': 3267563389, 'newMsgId': 7462106856263168649, 'createTime': 1764935999, 'wcId': 'wxid_raxq4pq3emg212', 'wId': 'c93f9844-ae20-4bc0-b15f-45dc36cd17bd'}]
             sent_list = self.sent_msg[key]
@@ -204,11 +198,10 @@ class APIMessage(metaclass=SingletonMeta):
 
                     try:
                         _, err = await async_post(
-                            url='http://{}/revokeMsg'.format(
-                                self.cookie.WKTEAM_IP_PORT),
+                            url=f'http://{self.cookie.WKTEAM_IP_PORT}/revokeMsg',
                             data=sent,
                             headers=headers)
-                    except Exception as e:
+                    except Exception:
                         # 遇到异常，尽力撤回
                         logger.warning(str(err))
                         await asyncio.sleep(1)
@@ -216,7 +209,7 @@ class APIMessage(metaclass=SingletonMeta):
 
     async def download_image(
             self, param: dict,
-            data_dir: str) -> Tuple[Optional[str], Optional[str]]:
+            data_dir: str) -> tuple[str | None, str | None]:
         """Download group chat image."""
         content = param['content']
         msgId = param['msgId']
@@ -240,8 +233,7 @@ class APIMessage(metaclass=SingletonMeta):
 
         try:
             # Get image URL from WKTeam API
-            json_obj, err = await async_post('http://{}/getMsgImg'.format(
-                self.cookie.WKTEAM_IP_PORT),
+            json_obj, err = await async_post(f'http://{self.cookie.WKTEAM_IP_PORT}/getMsgImg',
                                              data=data,
                                              headers=headers)
             if err is not None:
@@ -249,13 +241,13 @@ class APIMessage(metaclass=SingletonMeta):
                 return None, None
 
             if json_obj['code'] != '1000':
-                logger.error('download {} {}'.format(data, json_obj))
+                logger.error(f'download {data} {json_obj}')
                 return None, None
 
             image_url = json_obj['data']['url']
 
             # Download image to local
-            logger.info('image url {}'.format(image_url))
+            logger.info(f'image url {image_url}')
             async with aiohttp.ClientSession() as session:
                 async with session.get(image_url) as resp:
                     if resp.status == 200:
@@ -264,7 +256,7 @@ class APIMessage(metaclass=SingletonMeta):
                             os.makedirs(image_dir)
                         image_path = os.path.join(
                             image_dir, generate_hash_filename(data=data))
-                        logger.debug('local path {}'.format(image_path))
+                        logger.debug(f'local path {image_path}')
 
                         async with aiofiles.open(image_path,
                                                  'wb') as image_file:

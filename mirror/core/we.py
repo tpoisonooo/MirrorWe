@@ -2,22 +2,16 @@
 微信实体工厂类 - 提供Person和Group对象的LRU缓存管理
 """
 
+import atexit
 import os
 import weakref
-import atexit
-from typing import Optional, Dict, Any, Union
-from functools import lru_cache
-from loguru import logger
-import asyncio
-from pathlib import Path
+from typing import Any
 
-from .person import Person
+from loguru import logger
+
 from .group import Group
-from .memory import MemoryStream
-from .inner import Inner, dump_multi_inner_async, parse_multi_inner_async
-from ..primitive import try_load_text
-import weakref
-import atexit
+from .inner import dump_multi_inner_async
+from .person import Person
 
 
 class WeFactory:
@@ -41,8 +35,8 @@ class WeFactory:
         self.max_cache_size = max_cache_size
 
         # 使用weakref管理缓存对象，允许垃圾回收
-        self._person_cache: Dict[str, weakref.ref] = {}
-        self._group_cache: Dict[str, weakref.ref] = {}
+        self._person_cache: dict[str, weakref.ref] = {}
+        self._group_cache: dict[str, weakref.ref] = {}
 
         # 统计信息
         self._cache_stats = {
@@ -94,7 +88,7 @@ class WeFactory:
 
     async def get_person_async(self,
                                wxid: str,
-                               auto_create: bool = True) -> Optional[Person]:
+                               auto_create: bool = True) -> Person | None:
         """
         获取Person对象
         
@@ -141,7 +135,7 @@ class WeFactory:
 
     async def get_group_async(self,
                               group_id: str,
-                              auto_create: bool = True) -> Optional[Group]:
+                              auto_create: bool = True) -> Group | None:
         """
         获取Group对象
         
@@ -194,7 +188,7 @@ class WeFactory:
     async def get_entity(
             self,
             wxid: str,
-            auto_create: bool = True) -> Optional[Union[Person, Group]]:
+            auto_create: bool = True) -> Person | Group | None:
         """
         智能获取实体对象，自动判断类型
         
@@ -250,7 +244,7 @@ class WeFactory:
             self._cache_stats['evictions'] += 1
             logger.info(f"清理Group缓存: {group_id}")
 
-    async def _sync_entity_data(self, entity: Union[Person, Group]) -> None:
+    async def _sync_entity_data(self, entity: Person | Group) -> None:
         """
         同步实体数据到磁盘
         
@@ -287,7 +281,7 @@ class WeFactory:
         except Exception as e:
             logger.error(f"同步实体数据失败: {e}")
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """获取缓存统计信息"""
         return {
             'person_cache_size': len(self._person_cache),
@@ -315,7 +309,7 @@ class WeFactory:
 
 
 # 全局工厂实例
-_factory_instance: Optional[WeFactory] = None
+_factory_instance: WeFactory | None = None
 
 
 def get_factory(max_cache_size: int = 128) -> WeFactory:

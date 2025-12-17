@@ -1,34 +1,25 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import textwrap
 from pathlib import Path
-from argparse import ArgumentParser
-from typing import Literal
-
-from dotenv import load_dotenv
-from pydantic import BaseModel
 
 import kosong
-from kosong.chat_provider import ChatProvider
-from kosong.message import Message
-from kosong.tooling import CallableTool2, ToolError, ToolOk, ToolResult, ToolReturnValue, Toolset
-from kosong.tooling.simple import SimpleToolset
+from dotenv import load_dotenv
 from kosong.chat_provider.kimi import Kimi
-
-from ..tool.circle import GetCircleList, SnsPraise, SnsComment, SnsSend
-from ..tool.contact import ListGroup, ListPrivateFriend, GroupChatFriend, SearchAndAdd, GetContact
-from ..tool.message import RevertAll, SendGroupUrl, SendGroupEmoji, SendGroupText, SendGroupImage, SendUserText
-from ..tool.think import Think
-from ..primitive import load_desc, time_string
-from ..core import Person, build_self_inner
-from typing import List, Dict, Any
+from kosong.message import Message
+from kosong.tooling import ToolResult
 from loguru import logger
-from .helper import build_toolset
-import json
 
-import json
+from ..core import Person, build_self_inner
+from ..primitive import load_desc, time_string
+from ..tool.message import (
+    SendGroupText,
+    SendUserText,
+)
+from .helper import build_toolset
 
 load_dotenv()
 
@@ -95,7 +86,7 @@ class Doll:
             result = await kosong.step(
                 chat_provider=self.chat_provider,
                 system_prompt=system_prompt,
-                toolset=build_toolset(skip=skip),
+                toolset=toolset,
                 history=history,
             )
 
@@ -160,7 +151,7 @@ class Doll:
             result = await kosong.step(
                 chat_provider=self.chat_provider,
                 system_prompt=system_prompt,
-                toolset=build_toolset(skip=skip),
+                toolset=toolset,
                 history=history,
             )
 

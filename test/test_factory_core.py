@@ -4,7 +4,6 @@
 """
 
 import sys
-import os
 from pathlib import Path
 
 
@@ -46,7 +45,7 @@ def test_group_id_detection():
 
 def test_path_construction():
     """测试路径构建逻辑"""
-    print(f"\n=== 测试路径构建逻辑 ===")
+    print("\n=== 测试路径构建逻辑 ===")
 
     # 模拟工厂类的路径构建
     def construct_paths(entity_id: str, entity_type: str) -> str:
@@ -80,7 +79,7 @@ def test_path_construction():
 
 def test_cache_key_logic():
     """测试缓存键逻辑（简化版，不依赖数据同步）"""
-    print(f"\n=== 测试缓存键逻辑 ===")
+    print("\n=== 测试缓存键逻辑 ===")
 
     # 模拟缓存结构（只测试键管理，不涉及数据同步）
     person_cache = {}
@@ -166,7 +165,7 @@ def main():
 
     success = test1 and test2 and test3
 
-    print(f"\n=== 验证结果总结 ===")
+    print("\n=== 验证结果总结 ===")
     print(f"群聊ID检测: {'通过' if test1 else '失败'}")
     print(f"路径构建: {'通过' if test2 else '失败'}")
     print(f"缓存键逻辑: {'通过' if test3 else '失败'}")

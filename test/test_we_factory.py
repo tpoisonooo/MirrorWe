@@ -64,7 +64,7 @@ async def test_factory():
 
         # 测试缓存统计
         stats = factory.get_cache_stats()
-        print(f"\n=== 缓存统计 ===")
+        print("\n=== 缓存统计 ===")
         print(f"Person缓存: {stats['person_cache_size']}")
         print(f"Group缓存: {stats['group_cache_size']}")
         print(f"总缓存: {stats['total_cached']}")
@@ -74,7 +74,7 @@ async def test_factory():
         print(f"Group未命中: {stats['group_misses']}")
 
         # 测试缓存命中
-        print(f"\n=== 测试缓存命中 ===")
+        print("\n=== 测试缓存命中 ===")
         person2 = await factory.get_person(test_wxid)
         if person2 is person:
             print("✓ 缓存命中成功（同一对象）")
@@ -83,7 +83,7 @@ async def test_factory():
 
         # 清理
         await factory.cleanup()
-        print(f"\n✓ 清理完成")
+        print("\n✓ 清理完成")
 
         return True
 

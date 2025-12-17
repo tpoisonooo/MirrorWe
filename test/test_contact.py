@@ -3,9 +3,8 @@
 改进的联系人测试文件 - 展示不同的导入方式
 """
 
-import sys
-import os
 import asyncio
+import sys
 from pathlib import Path
 
 # 方法1: 将项目根目录添加到 Python 路径 (推荐用于测试)
@@ -85,7 +84,7 @@ async def main():
     passed = sum(test_results)
     total = len(test_results)
 
-    print(f"\n=== 测试总结 ===")
+    print("\n=== 测试总结 ===")
     print(f"通过: {passed}/{total}")
 
     return passed == total

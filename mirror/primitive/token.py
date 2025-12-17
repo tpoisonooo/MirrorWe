@@ -1,5 +1,6 @@
-import tiktoken
 import re
+
+import tiktoken
 
 ENCODER = None
 

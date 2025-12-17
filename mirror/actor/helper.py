@@ -1,21 +1,19 @@
 from __future__ import annotations
 
 from kosong.tooling.simple import SimpleToolset
-from kosong.chat_provider.kimi import Kimi
 
-from ..tool.circle import GetCircleList, GetCircleDetail, SnsPraise, SnsComment, SnsSend
-from ..tool.contact import ListGroup, ListPrivateFriend, GroupChatFriend, SearchAndAdd, GetContact
-from ..tool.message import RevertAll, SendGroupUrl, SendGroupEmoji, SendGroupText, SendGroupImage, SendUserText
-from ..tool.think import Think, Wait, Finish
+from ..tool.circle import GetCircleDetail, GetCircleList, SnsComment, SnsPraise
+from ..tool.contact import GetContact, GroupChatFriend, ListGroup, ListPrivateFriend, SearchAndAdd
+from ..tool.message import (
+    RevertAll,
+    SendGroupText,
+    SendUserText,
+)
 from ..tool.search import WebSearch
-from ..primitive import load_desc, time_string
-from ..core import Person
-
-from typing import List, Dict, Any
-from loguru import logger
+from ..tool.think import Finish, Think, Wait
 
 
-def build_toolset(skip: List[str] = []) -> SimpleToolset:
+def build_toolset() -> SimpleToolset:
     toolset = SimpleToolset()
     # 朋友圈相关
     toolset += GetCircleList()

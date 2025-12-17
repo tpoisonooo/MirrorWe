@@ -1,11 +1,11 @@
+
 from .core.inner import parse_multi_inner_async
-from .core.we import WeFactory, get_factory
+from .core.we import get_factory
 from .wechat import Message
 from .wechat.cookie import Cookie
-from typing import List
 
 
-async def from_origin(filepaths: List[str]):
+async def from_origin(filepaths: list[str]):
     factory = get_factory()
     cookie = Cookie()
     for filepath in filepaths:
@@ -32,7 +32,6 @@ async def from_origin(filepaths: List[str]):
 
 if __name__ == "__main__":
     import asyncio
-    import sys
 
     filepaths = [
         # '/root/konghuanjun/HuixiangDou/wkteam/wechat_message.jsonl.20250305',

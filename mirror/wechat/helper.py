@@ -1,29 +1,27 @@
-import aiohttp
-import json
-from loguru import logger
-
-import os
-import time
 import fcntl
+import json
+import time
 from datetime import datetime
 from pathlib import Path
+
+import aiohttp
+from loguru import logger
 
 
 async def async_post(url, data, headers):
     """Wrap http post and error handling - now async."""
     logger.debug((url, data))
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, data=json.dumps(data),
-                                headers=headers) as resp:
-            json_str = await resp.text()
-            logger.debug(json_str)
-            if resp.status != 200:
-                return None, Exception(f'wkteam auth fail {json_str}')
-            json_obj = json.loads(json_str)
-            if json_obj['code'] != '1000':
-                return json_obj, Exception(json_str)
-            return json_obj, None
+    async with aiohttp.ClientSession() as session, session.post(url, data=json.dumps(data),
+                            headers=headers) as resp:
+        json_str = await resp.text()
+        logger.debug(json_str)
+        if resp.status != 200:
+            return None, Exception(f'wkteam auth fail {json_str}')
+        json_obj = json.loads(json_str)
+        if json_obj['code'] != '1000':
+            return json_obj, Exception(json_str)
+        return json_obj, None
 
 
 def daily_task_once():
@@ -58,7 +56,7 @@ def daily_task_once():
             print(f"✅ 执行成功！创建文件: {date_file}")
             return True
 
-    except (IOError, BlockingIOError):
+    except (OSError, BlockingIOError):
         # 无法获取锁，说明今天已执行
         if date_file.exists():
             content = date_file.read_text().strip()
