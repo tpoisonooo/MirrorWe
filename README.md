@@ -79,4 +79,4 @@ cp .env_example .env
 ```
 
 ## 📜 License
-本项目遵循 [GPL license](./LICENSE)，不可用于商业行为。
+本项目遵循 [GPL license](./LICENSE)，须联系微信 tpoisonooo 获取授权
