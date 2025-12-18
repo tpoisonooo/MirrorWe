@@ -59,7 +59,8 @@ cp .env_example .env
   - `--actor` 启用哪个角色回复私聊
   - `--act_group_id` 这个角色响应哪个群
   - `--forward` 跨群转发图片文字表情包和链接。`.env` 配置了群号
-- `uv run -m mirror.main` 输入命令，让 AI 在微信中思考执行（需要先运行几天 `mirror.cli`）
+- `uv run -m mirror.main` 输入命令，让 AI 在微信中思考执行
+  - 得先运行几天 `mirror.cli`，积攒了人物数据效果才好
 
 
 ## 🔗 致谢和引用
