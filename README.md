@@ -1,11 +1,14 @@
 ## 🏹 MirrorWe
 <div>
-<a href="https://cdn.vansin.top/internlm/dou.jpg" target="_blank">
-<img alt="Wechat" src="https://img.shields.io/badge/wechat-bot%20inside-brightgreen?logo=wechat&logoColor=white" />
-</a>
-<a href="https://youtu.be/2lDYDXifWMs" target="_blank">
-<img alt="YouTube" src="https://img.shields.io/badge/YouTube-black?logo=youtube&logoColor=red" />
-</a>
+    <a href="https://cdn.vansin.top/internlm/dou.jpg" target="_blank">
+        <img alt="Wechat" src="https://img.shields.io/badge/wechat-bot%20inside-brightgreen?logo=wechat&logoColor=white" />
+    </a>
+    <a href="https://zhuanlan.zhihu.com/p/1982903954619769866" target="_blank">
+        <img alt="ZhiHu" src="https://img.shields.io/badge/MirrorWe-gray?logo=zhihu" />
+    </a>
+    <a href="https://youtu.be/2lDYDXifWMs" target="_blank">
+        <img alt="YouTube" src="https://img.shields.io/badge/YouTube-black?logo=youtube&logoColor=red" />
+    </a>
 </div>
 
 建模好友和群组，描述特点的同时不遗漏细节。见[样例](./resource/example_bio.md)。
@@ -25,7 +28,7 @@ AI 思考执行微信任务：
     <video src="https://github.com/user-attachments/assets/88486917-1243-42c7-8ed6-c5e6a4d81857" controls></video>
     </details>
 
-**自动托管** 搜索微信用户 **MirrorWe** ，设定见 [人物小传](./mirror/actor/doll.md)。
+**自动托管** 搜索微信用户 **MirrorWe** ，设定见 [人物小传](./mirror/actor/doll.md) 和 [这么写的原因](https://zhuanlan.zhihu.com/p/1982903954619769866)。
     <details>
     <summary>点击查看回复</summary>
     <img width="675" height="444" alt="Image" src="https://github.com/user-attachments/assets/729a5701-9583-4aa1-af07-5874e84a094e" controls></img>
