@@ -108,7 +108,7 @@ class Doll:
                     # 私聊每轮最多发 2 条消息
                     send_user_text_tool_life -= 1
                     if send_user_text_tool_life <= 0:
-                        toolset -= SendUserText()
+                        toolset.remove(SendUserText.name)
 
             assistant_message = result.message
             tool_messages = [
@@ -167,7 +167,7 @@ class Doll:
                         send_text = tool_call_arguments.get('text', '')
                         group_id = tool_call_arguments.get('group_id', '')
                         # 群聊每次最多发送 1 条消息
-                        toolset -= SendGroupText()
+                        toolset.remove(SendGroupText.name)
                     except Exception as e:
                         logger.error(f'Parse tool_call_arguments failed, {str(e)}: {str(tool_call.function.arguments)}')
                         send_text = tool_call.function.arguments
