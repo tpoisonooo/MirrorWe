@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from kosong.message import Message
+from kosong.tooling import ToolResult
 from kosong.tooling.simple import SimpleToolset
 
 from ..tool.circle import GetCircleDetail, GetCircleList, SnsComment, SnsPraise
@@ -48,3 +50,11 @@ def build_toolset() -> SimpleToolset:
     toolset += Wait()
     toolset += Finish()
     return toolset
+
+
+def tool_result_to_message(result: ToolResult) -> Message:
+    return Message(
+        role="tool",
+        tool_call_id=result.tool_call_id,
+        content=result.return_value.output,
+    )

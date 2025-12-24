@@ -13,6 +13,7 @@ import random
 from aiohttp import web
 from loguru import logger
 
+from .actor import GroupActor, PrivateActor
 from .core.we import get_factory
 from .primitive import (
     always_get_an_event_loop,
@@ -40,15 +41,11 @@ class WkteamManager:
         self.api_manage = APIManage()
         self.api_contact = APIContact()
         self.api_circle = APICircle()
-        self.actor = None
-        self.act_group_id = None
+        self.private_actor = PrivateActor()
+        self.group_actor = GroupActor()
         self.factory = get_factory()
 
     def setup(self, args):
-        match args.actor:
-            case 'doll':
-                from .actor import Doll
-                self.actor = Doll()
         self.act_group_id = args.act_group_id
 
     async def bind(self,
@@ -183,8 +180,8 @@ class WkteamManager:
                 p = await self.factory.get_person_async(wxid=msg.sender_id)
                 await p.update(wk_msg=msg)
 
-                if self.actor:
-                    await self.actor.agent_loop_private(p)
+                if self.private_actor:
+                    await self.private_actor.agent_loop(p)
 
             elif msg._type.startswith('8'):
                 # 6. 如果群聊消息，更新发送人和群记录
@@ -194,8 +191,9 @@ class WkteamManager:
                 await g.update(wk_msg=msg)
 
                 # 如果是配置的 act_group_id，则触发群内处理
-                if self.actor and self.act_group_id is not None in msg.group_id:
-                    await self.actor.agent_loop_group(g, p)
+                if self.group_actor and self.act_group_id is not None and msg.group_id==self.act_group_id:
+                    await self.group_actor.evolution(g)
+                    await self.group_actor.agent_loop(g, p)
 
             # 7. 如果是群消息，是否需要跨群转发
             if msg._type.startswith('8') and forward:

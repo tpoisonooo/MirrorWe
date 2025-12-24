@@ -1,5 +1,7 @@
-from .doll import Doll
+from .group import GroupActor
+from .private import PrivateActor
 
 __all__ = [
-    'Doll',
+    'PrivateActor',
+    'GroupActor',
 ]
