@@ -11,9 +11,9 @@
     </a>
 </div>
 
-建模好友和群组，描述特点的同时不遗漏细节。见[样例](./resource/example_bio.md)。
+基于 WeChat 信息建模好友和群组，描述特点的同时不遗漏细节。见[样例](./resource/example_bio.md)。
 
-AI 思考执行微信任务：
+AI 思考执行微信任务，进化方式见 [evolution.md](./mirror/actor/group/evolution.md)：
 - 群/私聊消息收发；搜索添加陌生人
 - 自动发朋友圈，点赞评论
 - 跨群广播文字、图片、表情包、链接。运营神器！
@@ -28,7 +28,7 @@ AI 思考执行微信任务：
     <video src="https://github.com/user-attachments/assets/88486917-1243-42c7-8ed6-c5e6a4d81857" controls></video>
     </details>
 
-**自动托管** 搜索微信用户 **MirrorWe** ，设定见 [人物小传](./mirror/actor/doll.md) 和 [这么写的原因](https://zhuanlan.zhihu.com/p/1982903954619769866)。
+**自动托管** 搜索微信用户 **MirrorWe** ，设定见 [人物小传](./mirror/actor/private/self.md)
     <details>
     <summary>点击查看回复</summary>
     <img width="675" height="444" alt="Image" src="https://github.com/user-attachments/assets/729a5701-9583-4aa1-af07-5874e84a094e" controls></img>

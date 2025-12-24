@@ -31,6 +31,12 @@ class MemoryStream:
         if moment:
             self.moment.append(moment)
 
+    def recent_group_json_str(self, limit:int=50):
+        group_json_str = Inner.schema().dumps(self.group[-limit:],
+                                              many=True,
+                                              ensure_ascii=False)
+        return group_json_str
+
     def recent(self, days=7):
         cutoff = datetime.now().timestamp() - days * 86400
         return [
