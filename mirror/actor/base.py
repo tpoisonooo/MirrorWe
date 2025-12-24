@@ -1,8 +1,8 @@
 import os
 from abc import ABC, abstractmethod
-import os
 
 from kosong.chat_provider.kimi import Kimi
+
 
 class ActorBase(ABC):
 

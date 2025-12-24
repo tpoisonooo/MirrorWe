@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-import aiofiles
 import json
 import textwrap
 from pathlib import Path
 
+import aiofiles
 import kosong
 from dotenv import load_dotenv
 from kosong.message import Message, TextPart
@@ -17,7 +17,7 @@ from ...tool.message import (
     SendGroupText,
 )
 from ..base import ActorBase
-from ..helper import tool_result_to_message, build_toolset
+from ..helper import build_toolset, tool_result_to_message
 
 load_dotenv()
 

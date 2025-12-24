@@ -8,7 +8,6 @@ from pathlib import Path
 import kosong
 from dotenv import load_dotenv
 from kosong.message import Message
-from kosong.tooling import ToolResult
 from loguru import logger
 
 from ...core import Person, build_self_inner
@@ -17,7 +16,7 @@ from ...tool.message import (
     SendUserText,
 )
 from ..base import ActorBase
-from ..helper import tool_result_to_message, build_toolset
+from ..helper import build_toolset, tool_result_to_message
 
 load_dotenv()
 
