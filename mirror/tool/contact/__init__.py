@@ -1,16 +1,17 @@
+import inspect
+import os
 from pathlib import Path
-from typing import override, List
+from typing import List, override
 
 from kosong.tooling import CallableTool2, ToolOk, ToolReturnValue
 from pydantic import BaseModel, Field
-from ...core.inner import parse_multi_inner_async 
+
+from ...core.inner import parse_multi_inner_async
 from ...primitive import load_desc, try_load_text
 
-import inspect
-import os
 
 class GetContactParams(BaseModel):
-    wc_id: List[str] = Field(description="微信用户 ID 或 group_id")
+    wc_id: list[str] = Field(description="微信用户 ID 或 group_id")
 
 class GetContact(CallableTool2[GetContactParams]):
     name: str = "GetContact"
@@ -22,7 +23,7 @@ class GetContact(CallableTool2[GetContactParams]):
         from mirror.wechat.api_contact import APIContact
         api = APIContact()
         result = await api.get_contact([params.wc_id])
-        return ToolOk(output=str(result), message=f"成功获取 params.wc_id 的联系人信息")
+        return ToolOk(output=str(result), message="成功获取 params.wc_id 的联系人信息")
 
 class SearchAndAddParams(BaseModel):
     phone: str = Field(default=None, description="手机号码，用于搜索添加好友")

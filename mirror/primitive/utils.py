@@ -1,12 +1,13 @@
 """
 工具函数模块
 """
-import os
 import asyncio
+import os
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
 import aiofiles
 from loguru import logger
-from pathlib import Path
-from datetime import datetime, timezone, timedelta
 
 
 def time_string() -> str:
@@ -45,7 +46,7 @@ async def try_load_text(path: str, default: str = '') -> str:
         return default
 
     try:
-        async with aiofiles.open(path, mode='r', encoding='utf-8') as f:
+        async with aiofiles.open(path, encoding='utf-8') as f:
             text = await f.read()
             text = text.strip()
     except Exception as e:

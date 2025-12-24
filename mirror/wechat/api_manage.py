@@ -1,12 +1,11 @@
-from typing import List, Any, Dict
-import aiohttp
 import json
+
 from loguru import logger
+
+from ..primitive import SingletonMeta, safe_write_text
 from .cookie import Cookie
 from .helper import async_post
-from ..primitive import safe_write_text, SingletonMeta
-import aiofiles
-import time
+
 
 class APIManage(metaclass=SingletonMeta):
 
@@ -74,8 +73,8 @@ class APIManage(metaclass=SingletonMeta):
         # set callback url
         callback_ip = self.cookie.callback_ip
         callback_port = self.cookie.callback_port
-        httpUrl = 'http://{}:{}/callback'.format(callback_ip, callback_port)
-        logger.debug('set callback url {}'.format(httpUrl))
+        httpUrl = f'http://{callback_ip}:{callback_port}/callback'
+        logger.debug(f'set callback url {httpUrl}')
         headers = {
             'Content-Type': 'application/json',
             'Authorization': self.cookie.auth
@@ -90,6 +89,5 @@ class APIManage(metaclass=SingletonMeta):
         if err is not None:
             return err
 
-        logger.info('login success, all license come from {}'.format(
-            self.cookie.license_path))
+        logger.info(f'login success, all license come from {self.cookie.license_path}')
         return None

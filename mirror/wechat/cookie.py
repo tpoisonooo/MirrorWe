@@ -1,13 +1,13 @@
-from dotenv import load_dotenv
-from ..primitive import get_env_or_raise, get_env_with_default
 import os
-import json
-from loguru import logger
+
+from dotenv import load_dotenv
+
+from ..primitive import get_env_or_raise
+from ..primitive.metaclass import SingletonMeta
 
 load_dotenv()
 
-
-class Cookie:
+class Cookie(metaclass=SingletonMeta):
 
     def __init__(self):
         self.WKTEAM_IP_PORT = '121.229.29.88:9899'

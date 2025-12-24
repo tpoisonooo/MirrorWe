@@ -1,34 +1,24 @@
 """LLM proxy."""
-import json
-import pdb
-import os
-from .limitter import RPM, TPM
-from .utils import always_get_an_event_loop
 import asyncio
-from typing import Dict, List, Dict, Union, AsyncGenerator
-import pytoml
-from loguru import logger
-from openai import AsyncOpenAI, APIConnectionError, RateLimitError, Timeout, APITimeoutError
-from .token import encode_string, decode_tokens
-from tenacity import (
-    retry,
-    stop_after_attempt,
-    wait_exponential,
-    retry_if_exception_type,
-)
-from functools import wraps
-import sqlite3
-import uuid
 import hashlib
-from datetime import datetime
-
-from .db import DB
-from .utils import get_env_or_raise, get_env_with_default, time_string
+import os
+from functools import wraps
 
 from kosong.chat_provider.kimi import Kimi
-from kosong.message import ContentPart, Message, TextPart, ThinkPart, ToolCall, ToolCallPart
-from kosong.tooling import Tool
-from kosong.chat_provider import APIStatusError, StreamedMessagePart
+from kosong.message import Message, TextPart
+from loguru import logger
+from openai import APIConnectionError, APITimeoutError, RateLimitError, Timeout
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
+
+from .db import DB
+from .limitter import RPM, TPM
+from .token import encode_string
+from .utils import get_env_or_raise, get_env_with_default, time_string
 
 
 class ChatCache:
@@ -63,7 +53,7 @@ class ChatCache:
                 VALUES (?, ?, ?, ?)
             ''', (_hash, query, response, backend))
 
-    def get(self, query: str, backend: str = 'default') -> Union[str, None]:
+    def get(self, query: str, backend: str = 'default') -> str | None:
         """Retrieve a chunk by its ID."""
         if not query:
             return None
@@ -126,8 +116,10 @@ class LLM:
     async def chat_text(self,
                         prompt: str,
                         system_prompt=None,
-                        tools=[]) -> str:
+                        tools=None) -> str:
         """Chat with text response."""
+        if tools is None:
+            tools = []
         llm_cache_enable = get_env_with_default('LLM_CACHE_ENABLE', False)
         if llm_cache_enable:
             r = self.cache.get(query=prompt, backend=self.provider.model)

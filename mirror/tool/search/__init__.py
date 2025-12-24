@@ -1,22 +1,22 @@
 """Web search utils."""
-import aiohttp
+import asyncio
 import json
 import types
-import pytoml
-from bs4 import BeautifulSoup as BS
-from loguru import logger
+from pathlib import Path
+from typing import List, override
 
-from typing import List
-from alibabacloud_tea_openapi.models import Config
+import aiohttp
+import pytoml
 from alibabacloud_searchplat20240529.client import Client
 from alibabacloud_searchplat20240529.models import GetWebSearchRequest
-import asyncio
-from pathlib import Path
-from typing import override
-
+from alibabacloud_tea_openapi.models import Config
+from bs4 import BeautifulSoup as BS
 from kosong.tooling import CallableTool2, ToolOk, ToolReturnValue
+from loguru import logger
 from pydantic import BaseModel, Field
-from ...primitive import load_desc, get_env_with_default
+
+from ...primitive import get_env_with_default, load_desc
+
 
 class WebSearchParams(BaseModel):
     query : str = Field(description=("The query to search about."))

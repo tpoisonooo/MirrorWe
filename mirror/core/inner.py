@@ -5,20 +5,19 @@
 """
 
 import json
-import asyncio
+import os
+import time
+from collections.abc import AsyncGenerator
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
 import aiofiles
 import aiofiles.os
 import anyio
-
-from typing import AsyncGenerator, Optional
-from typing import Any, List, Dict
-from loguru import logger
-from pathlib import Path
-
-import os
-
-from dataclasses import dataclass
 from dataclasses_json import dataclass_json
+from loguru import logger
+
 from ..wechat.message import Message
 
 
@@ -33,13 +32,19 @@ class Inner:
     content: str = ''
     ts: int = 0
 
+def build_self_inner(sender_name: str, content: str, group_id:str = '') -> Inner:
+    """构建自己的消息 Inner 对象"""
+    inner = Inner(type='text',
+                  sender_id='me',
+                  group_id=group_id,
+                  sender_name=sender_name,
+                  content=content,
+                  ts=int(time.time()))
+    return inner
 
 def convert_wkteam_to_inner(msg: Message):
     """将 wkteam 的 Message 对象转换为 Inner 对象"""
-    if msg.is_self:
-        sender_name = 'me'
-    else:
-        sender_name = msg.push_content.split(':')[0].strip()
+    sender_name = 'me' if msg.is_self else msg.push_content.split(':')[0].strip()
 
     inner = Inner(type=msg.type,
                   group_id=msg.group_id,
@@ -60,7 +65,7 @@ def convert_to_inner(obj: Any):
         raise ValueError("无法转换为 Inner 对象，类型未知")
 
 
-def dump_multi_inner_sync(file_path: str, objs: List[Inner], mode='write'):
+def dump_multi_inner_sync(file_path: str, objs: list[Inner], mode='write'):
     """
     同步保存多行JSON文件，逐对象写入
     
@@ -78,7 +83,7 @@ def dump_multi_inner_sync(file_path: str, objs: List[Inner], mode='write'):
     Path(file_path).parent.mkdir(parents=True, exist_ok=True)
 
     symbol = 'w' if mode == 'write' else 'a'
-    if 'append' == mode and not os.path.exists(file_path):
+    if mode == 'append' and not os.path.exists(file_path):
         # 如果文件不存在，改为写入模式
         symbol = 'w'
 
@@ -89,7 +94,7 @@ def dump_multi_inner_sync(file_path: str, objs: List[Inner], mode='write'):
 
 
 async def dump_multi_inner_async(file_path: str,
-                                 objs: List[Inner],
+                                 objs: list[Inner],
                                  mode='write'):
     """
     异步保存多行JSON文件，逐对象写入
@@ -111,7 +116,7 @@ async def dump_multi_inner_async(file_path: str,
     await anyio.Path(file_path).parent.mkdir(parents=True, exist_ok=True)
 
     symbol = 'w' if mode == 'write' else 'a'
-    if 'append' == mode and not os.path.exists(file_path):
+    if mode == 'append' and not os.path.exists(file_path):
         # 如果文件不存在，改为写入模式
         symbol = 'w'
 
@@ -123,7 +128,7 @@ async def dump_multi_inner_async(file_path: str,
 
 
 async def parse_multi_inner_async(file_path: str,
-                                  output='inner') -> AsyncGenerator[Any, None]:
+                                  output='inner') -> AsyncGenerator[Any]:
     """
     异步解析多行JSON文件，逐对象输出
     
@@ -141,7 +146,7 @@ async def parse_multi_inner_async(file_path: str,
         return
 
     try:
-        async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+        async with aiofiles.open(file_path, encoding='utf-8') as f:
             content = await f.read()
 
         # logger.debug(f"开始解析文件: {file_path}")

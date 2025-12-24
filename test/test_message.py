@@ -3,9 +3,8 @@
 改进的联系人测试文件 - 展示不同的导入方式
 """
 
-import sys
-import os
 import asyncio
+import sys
 from pathlib import Path
 
 # 方法1: 将项目根目录添加到 Python 路径 (推荐用于测试)

@@ -1,9 +1,9 @@
-from loguru import logger
-from typing import List, Union
-import xml.etree.ElementTree as ET
-import aiofiles
 import json
 import os
+import xml.etree.ElementTree as ET
+
+import aiofiles
+from loguru import logger
 
 
 class Message:
@@ -46,7 +46,7 @@ class Message:
 
         # format user input
         query = ''
-        atlist = data.get('atlist', [])
+        data.get('atlist', [])
         content = data.get('content', '')
         if _type in ['80014', '60014']:
             # ref message
@@ -56,7 +56,7 @@ class Message:
             root = ET.fromstring(data.get('content', ''))
 
             def search_key(xml_key: str):
-                elements = root.findall('.//{}'.format(xml_key))
+                elements = root.findall(f'.//{xml_key}')
                 value = ''
                 if len(elements) > 0:
                     value = elements[0].text
@@ -83,7 +83,7 @@ class Message:
             root = ET.fromstring(data.get('content', ''))
 
             def search_key(xml_key: str):
-                elements = root.findall('.//{}'.format(xml_key))
+                elements = root.findall(f'.//{xml_key}')
                 content = ''
                 if len(elements) > 0:
                     content = elements[0].text
@@ -153,14 +153,12 @@ class Message:
                 return True
         elif self._type == 14 or self._type == '80014':
             # 对于引用消息，如果要求撤回
-            if revert_cmd in self.data.get('title', ''):
-                return True
-            elif revert_cmd in self.content:
+            if revert_cmd in self.data.get('title', '') or revert_cmd in self.content:
                 return True
         return False
 
 
-async def save_message_to_file(file_paths: Union[List[str], str],
+async def save_message_to_file(file_paths: list[str] | str,
                                message: dict):
     """保存消息到指定的jsonl文件"""
     if isinstance(file_paths, str):

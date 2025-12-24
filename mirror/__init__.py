@@ -8,9 +8,9 @@ __version__ = "3.0.0"
 __author__ = "tpoisonooo"
 __description__ = "微信智能助手，基于大语言模型"
 
-from .wechat import APIContact, APICircle, APIMessage, APIManage
-from .core import Person, Group
+from .core import Group, Person
 from .primitive import always_get_an_event_loop
+from .wechat import APICircle, APIContact, APIManage, APIMessage
 
 __all__ = [
     'APIContact',

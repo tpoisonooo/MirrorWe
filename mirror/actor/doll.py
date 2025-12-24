@@ -1,30 +1,24 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import textwrap
 from pathlib import Path
-from argparse import ArgumentParser
-from typing import Literal
-
-from dotenv import load_dotenv
-from pydantic import BaseModel
 
 import kosong
-from kosong.chat_provider import ChatProvider
-from kosong.message import Message
-from kosong.tooling import CallableTool2, ToolError, ToolOk, ToolResult, ToolReturnValue, Toolset
-from kosong.tooling.simple import SimpleToolset
+from dotenv import load_dotenv
 from kosong.chat_provider.kimi import Kimi
-
-from ..tool.circle import GetCircleList, SnsPraise, SnsComment, SnsSend
-from ..tool.contact import ListGroup, ListPrivateFriend, GroupChatFriend, SearchAndAdd, GetContact
-from ..tool.message import RevertAll, SendGroupUrl, SendGroupEmoji, SendGroupText, SendGroupImage, SendUserText
-from ..tool.think import Think
-from ..primitive import load_desc, time_string
-from ..core import Person
-from typing import List, Dict, Any
+from kosong.message import Message
+from kosong.tooling import ToolResult
 from loguru import logger
+
+from ..core import Person, build_self_inner
+from ..primitive import load_desc, time_string
+from ..tool.message import (
+    SendGroupText,
+    SendUserText,
+)
 from .helper import build_toolset
 
 load_dotenv()
@@ -43,6 +37,7 @@ class Doll:
         assert api_key is not None, "Expect KIMI_API_KEY environment variable"
         model = model or "kimi-k2-turbo-preview"
 
+        self.name = 'MirrorDoll'
         self.chat_provider = Kimi(base_url=base_url,
                                   api_key=api_key,
                                   model=model)
@@ -50,6 +45,7 @@ class Doll:
         self.welcome_template = (Path(__file__).parent /
                                  "agent_welcome.md").read_text(
                                      encoding="utf-8")
+                                    
         logger.info(f'Awake {__name__}')
 
     def tool_result_to_message(self, result: ToolResult) -> Message:
@@ -66,7 +62,7 @@ class Doll:
     async def agent_loop_private(self, p: Person):
         history: list[Message] = []
         step = 0
-        max_step_size = 3
+        max_step_size = 4
 
         system_prompt = '{}\n\n{}'.format(
             time_string(), load_desc(Path(__file__).parent / "doll.md", {}))
@@ -82,10 +78,9 @@ class Doll:
                                         personality=str(p.analysis_result),
                                         local=str(local))
         history.append(Message(role="user", content=content))
-        toolset = build_toolset()
 
-        # 私聊每次最多发送 2 条消息，多了挺烦人的
         send_user_text_tool_life = 2
+        toolset = build_toolset()
         while step < max_step_size:
             step += 1
             result = await kosong.step(
@@ -101,9 +96,19 @@ class Doll:
 
             for tool_call in result.tool_calls:
                 if tool_call.function.name == 'SendUserText':
+                    try:
+                        send_text = json.loads(tool_call.function.arguments).get('text', '')
+                    except Exception as e:
+                        logger.error(f'Parse tool_call_arguments failed, {str(e)}: {str(tool_call.function.arguments)}')
+                        send_text = tool_call.function.arguments
+
+                    inner = build_self_inner(sender_name=self.name, content=send_text)
+                    p.memory.add(private=inner)
+
+                    # 私聊每轮最多发 2 条消息
                     send_user_text_tool_life -= 1
                     if send_user_text_tool_life <= 0:
-                        del toolset._tool_dict['SendUserText']
+                        toolset.remove(SendUserText.name)
 
             assistant_message = result.message
             tool_messages = [
@@ -125,7 +130,7 @@ class Doll:
     async def agent_loop_group(self, g: Group, p: Person):
         history: list[Message] = []
         step = 0
-        max_step_size = 2
+        max_step_size = 3
 
         system_prompt = '{}\n\n{}'.format(
             time_string(), load_desc(Path(__file__).parent / "doll.md", {}))
@@ -134,7 +139,6 @@ class Doll:
 
         current = g.memory.group[-1]
         local = g.memory.group[-30:-1] if len(g.memory.group) > 1 else []
-
         content = input_template.format(current=current,
                                         person_summary=p.summary,
                                         group_bio=g.bio,
@@ -142,8 +146,6 @@ class Doll:
         history.append(Message(role="user", content=content))
 
         toolset = build_toolset()
-        # 群聊每次最多发送 1 条消息，多了挺烦人的
-        send_user_text_tool_life = 1
         while step < max_step_size:
             step += 1
             result = await kosong.step(
@@ -159,9 +161,22 @@ class Doll:
             print(tool_results)
             for tool_call in result.tool_calls:
                 if tool_call.function.name == 'SendGroupText':
-                    send_user_text_tool_life -= 1
-                    if send_user_text_tool_life <= 0:
-                        del toolset._tool_dict['SendGroupText']
+                    # 取回参数
+                    try:
+                        tool_call_arguments = json.loads(tool_call.function.arguments)
+                        send_text = tool_call_arguments.get('text', '')
+                        group_id = tool_call_arguments.get('group_id', '')
+                        # 群聊每次最多发送 1 条消息
+                        toolset.remove(SendGroupText.name)
+                    except Exception as e:
+                        logger.error(f'Parse tool_call_arguments failed, {str(e)}: {str(tool_call.function.arguments)}')
+                        send_text = tool_call.function.arguments
+                        group_id = ''
+
+                    inner = build_self_inner(sender_name=self.name, content=send_text, group_id=group_id)
+                    # 群聊里需要加一下 MirrorDoll 发过的消息
+                    g.memory.add(group=inner)
+
 
             assistant_message = result.message
             tool_messages = [

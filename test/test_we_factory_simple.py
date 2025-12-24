@@ -25,7 +25,7 @@ def test_structure():
             return False
 
         # 读取文件内容进行分析
-        with open(factory_file, 'r', encoding='utf-8') as f:
+        with open(factory_file, encoding='utf-8') as f:
             content = f.read()
 
         # 检查关键组件
@@ -77,7 +77,7 @@ def test_structure():
         else:
             print("✗ 群聊ID识别逻辑")
 
-        print(f"\n=== 结构分析结果 ===")
+        print("\n=== 结构分析结果 ===")
         if not missing_components:
             print("✓ 所有关键组件都存在")
             return True
@@ -92,7 +92,7 @@ def test_structure():
 
 def test_group_id_detection():
     """测试群聊ID检测逻辑"""
-    print(f"\n=== 测试群聊ID检测 ===")
+    print("\n=== 测试群聊ID检测 ===")
 
     test_cases = [("wxid_normal_user", False, "普通用户ID"),
                   ("1234567890@chatroom", True, "标准群聊ID"),
@@ -125,7 +125,7 @@ if __name__ == '__main__':
     test2 = test_group_id_detection()
 
     success = test1 and test2
-    print(f"\n=== 总体结果 ===")
+    print("\n=== 总体结果 ===")
     print(f"结构测试: {'通过' if test1 else '失败'}")
     print(f"群聊ID检测: {'通过' if test2 else '失败'}")
     print(f"总体: {'通过' if success else '失败'}")

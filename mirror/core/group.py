@@ -2,29 +2,27 @@
 增强版 Person 类，支持加载本地消息数据
 """
 
-from abc import ABC, abstractmethod
-import json
-import os
-import sys
-import inspect
-import aiofiles
-import weakref
 import atexit
-from pathlib import Path
-from typing import List, Dict, Any
-from loguru import logger
-from ..prompt import GROUP_BIO, SUMMARY_BIO
-from .inner import convert_to_inner, Inner, parse_multi_inner_async, dump_multi_inner_sync, dump_multi_inner_async
-from .inner import convert_wkteam_to_inner
+import inspect
+import os
+import weakref
+from abc import ABC
 
-from ..primitive import try_load_text, safe_write_text
-from ..primitive import LLM
-from datetime import datetime
-from ..wechat.message import Message
+from loguru import logger
 
 # 添加项目路径
 from mirror.core.memory import MemoryStream
-from mirror.primitive import always_get_an_event_loop
+
+from ..primitive import LLM, safe_write_text, try_load_text
+from ..prompt import GROUP_BIO, SUMMARY_BIO
+from ..wechat.message import Message
+from .inner import (
+    Inner,
+    convert_wkteam_to_inner,
+    dump_multi_inner_async,
+    dump_multi_inner_sync,
+    parse_multi_inner_async,
+)
 
 
 # TODO
@@ -125,10 +123,7 @@ class Group(ABC):
         max_text_size = self.llm.max_token_size * 2 * 0.7
         cur_text_size = len(basic) + len(bio) + len(str(self.memory.group))
         cut_ratio = max_text_size / cur_text_size
-        if cut_ratio > 1.0:
-            cut_group_index = 0
-        else:
-            cut_group_index = max(0, int(cut_ratio * len(self.memory.group)))
+        cut_group_index = 0 if cut_ratio > 1.0 else max(0, int(cut_ratio * len(self.memory.group)))
 
         group = self.memory.group[-cut_group_index:]
         group_json_str = Inner.schema().dumps(group,

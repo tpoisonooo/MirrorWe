@@ -34,8 +34,10 @@ workdir/
 wkteam
 data/friends/
 data/groups/
+data/images/
 data/others/
 data/origin.jsonl
+
 .cache_llm
 license.json
 data.1211/
