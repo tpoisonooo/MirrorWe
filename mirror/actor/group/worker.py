@@ -16,6 +16,7 @@ from ...primitive import load_desc, time_string
 from ...tool.message import (
     SendGroupText,
 )
+from ...tool.think import Finish
 from ..base import ActorBase
 from ..helper import build_toolset, tool_result_to_message
 
@@ -32,14 +33,16 @@ class GroupActor(ActorBase):
         logger.info(f'Awake {__name__}')
 
     async def evolution(self, g: Group):
-        if len(g.memory.group) < g.max_keep / 2:
+        step = g.max_keep / 4
+        if len(g.memory.group) < step:
             return  # 消息量不足，不进行进化
 
-        if len(g.memory.group) % (g.max_keep / 2) != 0:
-            return  # 每 512 条消息进化一次
+        if len(g.memory.group) % step != 0:
+            return  # 每 256 条消息进化一次
 
+        import pdb; pdb.set_trace()
         template = (Path(__file__).parent / "evolution.md").read_text(encoding="utf-8")
-        prompt = template.format(name=self.name, bio=g.bio, history=g.memory.recent_group_json_str())
+        prompt = template.format(name=self.name, bio=g.bio, history=g.memory.recent_group_json_str(limit=step))
         
         text_part = TextPart(text='')
 
@@ -78,9 +81,11 @@ class GroupActor(ActorBase):
 
         current = g.memory.group[-1]
         local = g.memory.group[-30:-1] if len(g.memory.group) > 1 else []
-        content = input_template.format(current=current,
+        content = input_template.format(
+                                        now=time_string(),
+                                        current=current,
                                         person_summary=p.summary,
-                                        group_bio=g.bio,
+                                        group_summary=g.summary,
                                         local=str(local))
         history.append(Message(role="user", content=content))
 
@@ -98,7 +103,14 @@ class GroupActor(ActorBase):
 
             tool_results = await result.tool_results()
             print(tool_results)
+            
+            direct_break = False
+            
             for tool_call in result.tool_calls:
+                if tool_call.function.name == Finish.name:
+                    direct_break = True
+                    break
+
                 if tool_call.function.name == SendGroupText.name:
                     # 取回参数
                     try:
@@ -117,6 +129,8 @@ class GroupActor(ActorBase):
                     # 群聊里需要加一下 actor 发过的消息
                     g.memory.add(group=inner)
 
+            if direct_break:
+                break
 
             assistant_message = result.message
             tool_messages = [
