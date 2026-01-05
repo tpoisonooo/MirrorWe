@@ -5,6 +5,8 @@ import asyncio
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Dict
+import json_repair
 
 import aiofiles
 from loguru import logger
@@ -28,6 +30,9 @@ def load_desc(path: Path, substitutions: dict[str, str] | None = None) -> str:
         description = string.Template(description).substitute(substitutions)
     return description
 
+def parse_text_to_json(text: str) -> Dict:
+    json_obj = json_repair.loads(text)
+    return json_obj
 
 async def safe_write_text(file_path: str, content: str) -> bool:
     try:

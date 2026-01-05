@@ -184,16 +184,36 @@ class WkteamManager:
                     await self.private_actor.agent_loop(p)
 
             elif msg._type.startswith('8'):
-                # 6. 如果群聊消息，更新发送人和群记录
+                # 6. 如果群聊消息，更新发送人和群记录，并进行话题分类
                 p = await self.factory.get_person_async(wxid=msg.sender_id)
                 await p.update(wk_msg=msg)
                 g = await self.factory.get_group_async(group_id=msg.group_id)
-                await g.update(wk_msg=msg)
+                
+                # Update group with person_id for topic classification
+                await g.update(wk_msg=msg, person_id=msg.sender_id)
+                
+                # Log topic classification result
+                current_topic = g.get_current_topic()
+                if current_topic:
+                    logger.info(f"Message classified to topic: {current_topic.name} ({current_topic.topic_id})")
 
                 # 如果是配置的 act_group_id，则触发群内处理
                 if self.group_actor and self.act_group_id is not None and msg.group_id==self.act_group_id:
                     await self.group_actor.evolution(g)
-                    await self.group_actor.agent_loop(g, p)
+                    
+                    # Use topic-specific processing if available
+                    if current_topic:
+                        logger.info(f"Using topic-specific processing for topic: {current_topic.name}")
+                        await self.group_actor.process_topic_specific(g, current_topic, p)
+                    else:
+                        # Fallback to regular group processing
+                        await self.group_actor.agent_loop(g, p)
+                    
+                    # Log topic statistics
+                    all_topics = g.get_all_topics()
+                    logger.info(f"Group {g.group_id} topics: {len(all_topics)} total")
+                    for topic in all_topics:
+                        logger.debug(f"  - {topic.name}: {len(topic.memory.group)} messages")
 
             # 7. 如果是群消息，是否需要跨群转发
             if msg._type.startswith('8') and forward:

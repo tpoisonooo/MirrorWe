@@ -46,6 +46,7 @@ dependencies = [
     "alibabacloud-tea-openapi>=0.3.14",
     "alibabacloud-credentials==1.0.1",
     "ruff>=0.14.9",
+    "json-repair>=0.55.0",
 ]
 
 [[tool.uv.index]]

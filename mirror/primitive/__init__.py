@@ -7,7 +7,7 @@
 from .db import DB
 from .limitter import RPM, TPM
 from .llm import LLM, ChatCache
-from .metaclass import SingletonMeta
+from .metaclass import SingletonMeta, LRUCacheMetaclass
 from .token import decode_tokens, encode_string, judge_language
 from .utils import (
     always_get_an_event_loop,
@@ -17,6 +17,7 @@ from .utils import (
     safe_write_text,
     time_string,
     try_load_text,
+    parse_text_to_json,
 )
 
 __all__ = [
