@@ -104,6 +104,9 @@ class APIMessage(metaclass=SingletonMeta):
     async def send_group_text(self, group_id: str, text: str):
         text = await self.magic_text(text)
 
+        if len(text) < 1:
+            raise Exception('发送 text 内容为空')
+
         headers = {
             'Content-Type': 'application/json',
             'Authorization': self.cookie.auth
