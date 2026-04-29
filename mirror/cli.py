@@ -9,6 +9,7 @@ import inspect
 import json
 import os
 import random
+import sqlite3
 
 from aiohttp import web
 from loguru import logger
@@ -22,6 +23,158 @@ from .primitive import (
 from .wechat import APICircle, APIContact, APIManage, APIMessage
 from .wechat.cookie import Cookie
 from .wechat.message import Message, save_message_to_file
+
+
+class GroupMessageQueue:
+    """Persist and consume group messages with a fixed-size sqlite queue."""
+
+    def __init__(self, db_path: str, max_rows: int = 2000):
+        self.db_path = db_path
+        self.max_rows = max_rows
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        self._init_db()
+
+    def _connect(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    @staticmethod
+    def _is_missing_table_error(error: Exception) -> bool:
+        return "no such table: group_messages" in str(error).lower()
+
+    @staticmethod
+    def _decode_payload(payload: str):
+        try:
+            return json.loads(payload)
+        except Exception:
+            return payload
+
+    def _init_db(self):
+        with self._connect() as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS group_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    group_id TEXT NOT NULL DEFAULT '',
+                    payload TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            # 兼容已存在旧表（无 group_id 列）的场景
+            columns = {
+                row["name"]
+                for row in conn.execute("PRAGMA table_info(group_messages)")
+            }
+            if "group_id" not in columns:
+                conn.execute(
+                    "ALTER TABLE group_messages ADD COLUMN group_id TEXT NOT NULL DEFAULT ''"
+                )
+            conn.commit()
+
+    def put(self, group_id: str, payload: str):
+        for attempt in range(2):
+            try:
+                with self._connect() as conn:
+                    conn.execute(
+                        "INSERT INTO group_messages (group_id, payload) VALUES (?, ?)",
+                        (group_id, payload))
+                    conn.execute(
+                        """
+                        DELETE FROM group_messages
+                        WHERE id NOT IN (
+                            SELECT id FROM group_messages
+                            ORDER BY id DESC
+                            LIMIT ?
+                        )
+                        """, (self.max_rows, ))
+                    conn.commit()
+                return
+            except sqlite3.OperationalError as e:
+                if attempt == 0 and self._is_missing_table_error(e):
+                    logger.warning(
+                        f"group_messages table missing, recreate and retry: {e}")
+                    self._init_db()
+                    continue
+                raise
+
+    def consume(self, n: int) -> dict[str, list[str]]:
+        n = max(0, int(n))
+        if n == 0:
+            return {}
+
+        for attempt in range(2):
+            try:
+                with self._connect() as conn:
+                    rows = conn.execute(
+                        "SELECT id, group_id, payload FROM group_messages ORDER BY id ASC LIMIT ?",
+                        (n, )).fetchall()
+                    if not rows:
+                        return {}
+
+                    ids = [row["id"] for row in rows]
+                    conn.executemany("DELETE FROM group_messages WHERE id = ?",
+                                     ((message_id, ) for message_id in ids))
+                    conn.commit()
+                    grouped: dict[str, list[str]] = {}
+                    for row in rows:
+                        grouped.setdefault(row["group_id"], []).append(
+                            self._decode_payload(row["payload"]))
+                    return grouped
+            except sqlite3.OperationalError as e:
+                if attempt == 0 and self._is_missing_table_error(e):
+                    logger.warning(
+                        f"group_messages table missing, recreate and retry: {e}")
+                    self._init_db()
+                    continue
+                raise
+
+        return {}
+
+
+async def _parse_consume_size(request: web.Request, default: int = 1) -> int:
+    n = request.query.get('n', str(default))
+    if request.can_read_body:
+        try:
+            body = await request.json()
+            n = body.get('n', n)
+        except Exception:
+            # 请求体不是 json 时，继续使用 query 参数
+            pass
+
+    n_int = int(n)
+    if n_int < 0:
+        raise ValueError("n must be non-negative")
+    return n_int
+
+
+def build_consume_group_message_handler(group_queue: GroupMessageQueue):
+
+    async def consume_group_message(request: web.Request):
+        try:
+            n_int = await _parse_consume_size(request)
+        except Exception:
+            return web.json_response(
+                {
+                    "ok": False,
+                    "error": "invalid n, expect non-negative integer"
+                },
+                status=400)
+
+        grouped_messages = group_queue.consume(n_int)
+        consumed_count = sum(len(messages)
+                             for messages in grouped_messages.values())
+        return web.Response(
+            text=json.dumps(
+                {
+                    "ok": True,
+                    "requested": n_int,
+                    "consumed": consumed_count,
+                    "messages": grouped_messages,
+                },
+                ensure_ascii=False),
+            content_type='application/json')
+
+    return consume_group_message
 
 
 class WkteamManager:
@@ -54,6 +207,9 @@ class WkteamManager:
         logdir = self.cookie.data_dir
         port = self.cookie.callback_port
         os.makedirs(logdir, exist_ok=True)
+        group_queue = GroupMessageQueue(
+            db_path=os.path.join(logdir, 'group_producer.sql'))
+        consume_group_message = build_consume_group_message_handler(group_queue)
 
         async def forward_to_groups(msg: Message):
             """跨群转发"""
@@ -185,6 +341,10 @@ class WkteamManager:
 
             elif msg._type.startswith('8'):
                 # 6. 如果群聊消息，更新发送人和群记录
+                # 保存群消息到 sqlite 队列，供消费端按批拉取
+                group_queue.put(
+                    group_id=msg.group_id or '',
+                    payload=json.dumps(input_json, ensure_ascii=False))
                 p = await self.factory.get_person_async(wxid=msg.sender_id)
                 await p.update(wk_msg=msg)
                 g = await self.factory.get_group_async(group_id=msg.group_id)
@@ -203,7 +363,10 @@ class WkteamManager:
 
         # async bind，手动管理生命周期
         app = web.Application()
-        app.add_routes([web.post('/callback', msg_callback)])
+        app.add_routes([
+            web.post('/callback', msg_callback),
+            web.post('/consume_group_message', consume_group_message),
+        ])
 
         runner = web.AppRunner(app)
         await runner.setup()

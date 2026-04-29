@@ -40,7 +40,6 @@ class GroupActor(ActorBase):
         if len(g.memory.group) % step != 0:
             return  # 每 256 条消息进化一次
 
-        import pdb; pdb.set_trace()
         template = (Path(__file__).parent / "evolution.md").read_text(encoding="utf-8")
         prompt = template.format(name=self.name, bio=g.bio, history=g.memory.recent_group_json_str(limit=step))
         

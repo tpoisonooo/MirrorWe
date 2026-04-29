@@ -41,7 +41,7 @@ class APIMessage(metaclass=SingletonMeta):
         self.cookie = Cookie()
         self.sent_msg = {}
 
-    async def magic_text(self, text: str):
+    async def magic_text(self, text: str, target: str):
         model = get_env_or_raise("KIMI_MODEL_NAME")
         if 'qwen3' in model:
             # 过滤掉不像人类的部分
@@ -102,7 +102,7 @@ class APIMessage(metaclass=SingletonMeta):
         return None
 
     async def send_group_text(self, group_id: str, text: str):
-        text = await self.magic_text(text)
+        text = await self.magic_text(text, target=group_id)
 
         if len(text) < 1:
             raise Exception('发送 text 内容为空')
@@ -129,7 +129,7 @@ class APIMessage(metaclass=SingletonMeta):
         return None
 
     async def send_user_text(self, user_id: str, text: str):
-        text = await self.magic_text(text)
+        text = await self.magic_text(text, target=user_id)
         headers = {
             'Content-Type': 'application/json',
             'Authorization': self.cookie.auth
